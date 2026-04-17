@@ -1,0 +1,25 @@
+--- tc-config.orig	2016-01-23 11:37:39.384533903 -0600
++++ tc-config	2016-01-23 11:37:39.388535904 -0600
+@@ -2,6 +2,7 @@
+ # RC Script for Tiny Core Linux
+ # (c) Robert Shingledecker 2004-2012
+ # Several modifications for speed by Curaga
++# Customized by Isaac Schemm for NetbootCD 6.x (http://netbootcd.us)
+ . /etc/init.d/tc-functions
+ useBusybox
+ 
+@@ -487,13 +488,7 @@
+ 	echo "${GREEN}Laptop options enabled (AC, Battery and PCMCIA).${NORMAL}"
+ fi
+ 
+-if [ -n "$NOSWAP" ]; then
+-	echo "${BLUE}Ignoring swap partition(s) seek as requested.${NORMAL}"
+-else
+-	wait $fstab_pid
+-	/sbin/swapon -a 2>/dev/null
+-	if [ "$?" == 0 ]; then echo "${GREEN}Possible swap partition(s) enabled.${NORMAL}"; fi
+-fi
++#don't use any swap in netbootcd
+ 
+ if [ -n "$SWAPFILE" ]; then
+ 	wait $fstab_pid
