@@ -28,7 +28,7 @@ PATH=/usr/local/sbin:/usr/local/bin:$PATH
 export PATH
 export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-TITLE="NetbootCD Script 17.0 - April 17, 2026"
+TITLE="NetbootCD-Neo Script 17.0 - April 17, 2026"
 
 # Detect UEFI mode once at startup; used throughout the script.
 EFIMODE=0
