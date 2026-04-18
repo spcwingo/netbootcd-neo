@@ -27,6 +27,19 @@ WORK=$(pwd)/work
 DONE=$(pwd)/done
 NBINIT=${WORK}/nbinit
 
+# Always clean up the intermediate build tree, even if the script exits early
+# due to a set -e failure.  DONE (the output directory) is intentionally kept.
+cleanup() {
+    rm -rf "${WORK:-}" squashfs-root opt
+    rm -f "vmlinuz64-${COREVER}" "corepure64-${COREVER}.gz" \
+          "kexec-tools-${KEXEC_VER}.tar.xz" \
+          "dialog-x86_64.tcz" "ncursesw-x86_64.tcz" "openssl-x86_64.tcz"
+    for _pkg in ${WIFI_PKGS_ALL:-}; do
+        rm -f "${_pkg}-x86_64.tcz"
+    done
+}
+trap cleanup EXIT
+
 NBCDVER=17.0
 COREVER=17.0
 KEXEC_VER=2.0.29
@@ -69,7 +82,19 @@ for pkg in dialog ncursesw openssl; do
     fi
 done
 
-WIFI_PKGS="wifi wpa_supplicant-dbus \
+# Detect the kernel version shipped in corepure64 so we can request the
+# matching wireless kernel module package (wireless-<kver>.tcz).
+# TinyCore ships zero wireless drivers in corepure64 itself; they live in a
+# separate version-stamped package that installs into /usr/local/lib/modules/.
+KVER=$(gzip -cd "corepure64-${COREVER}.gz" | cpio -t 2>/dev/null \
+    | grep '^lib/modules/[^/]*$' | head -1 | sed 's|lib/modules/||')
+if [ -z "$KVER" ]; then
+    echo "ERROR: Could not detect kernel version from corepure64-${COREVER}.gz"
+    exit 1
+fi
+echo "Detected kernel version: $KVER"
+
+WIFI_PKGS="wifi wpa_supplicant-dbus iw wireless-${KVER} wireless-regdb wireless_tools \
     firmware-atheros \
     firmware-broadcom_bcm43xx firmware-broadcom_bnx2 firmware-broadcom_bnx2x \
     firmware-cavium_nic firmware-chelsio \
@@ -81,19 +106,48 @@ WIFI_PKGS="wifi wpa_supplicant-dbus \
     firmware-ralinkwifi firmware-rtl_nic firmware-rtlwifi \
     firmware-ti-connectivity firmware-tigon \
     firmware-vxge firmware-wlan firmware-zd1211"
-for pkg in $WIFI_PKGS; do
+# Download a TCZ package plus all of its transitive dependencies by reading
+# the .tcz.dep file that TinyCore publishes alongside each package.
+# Discovered names accumulate in WIFI_PKGS_ALL for extraction and cleanup.
+fetch_tcz() {
+    local pkg="$1"
+    if [ -z "$pkg" ]; then return 0; fi
+    case " ${WIFI_PKGS_ALL} " in *" ${pkg} "*) return 0 ;; esac
+    WIFI_PKGS_ALL="${WIFI_PKGS_ALL} ${pkg}"
+    printf '  [wifi dep] %s\n' "$pkg"
+
     if [ ! -f "${pkg}-x86_64.tcz" ]; then
-        wget "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz" || {
+        if ! wget -q -T 15 "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"; then
             rm -f "${pkg}-x86_64.tcz"
-            echo "ERROR: Failed to download ${pkg}.tcz from the TinyCore 17.x repository."
-            echo "This package is required for the wireless ISO.  Possible causes:"
-            echo "  - The package name has changed in a newer TinyCore release."
-            echo "  - The TinyCore mirror is temporarily unavailable."
-            echo "  - Check ${TCX64}/tcz/ to verify the package exists."
-            exit 1
-        }
+            echo "WARNING: Could not download ${pkg}.tcz — skipping"
+            return 0
+        fi
     fi
+
+    local depfile
+    depfile=$(mktemp)
+    wget -q -T 15 "$TCX64/tcz/${pkg}.tcz.dep" -O "$depfile" 2>/dev/null || true
+    if [ -s "$depfile" ]; then
+        # plain read (no IFS=) trims leading/trailing whitespace, so blank
+        # lines and whitespace-only lines become empty strings and are skipped
+        while read -r dep; do
+            dep="${dep%.tcz}"
+            dep="${dep//KERNEL/$KVER}"   # TinyCore uses KERNEL as a placeholder
+            if [ -n "$dep" ]; then
+                fetch_tcz "$dep"
+            fi
+        done < "$depfile"
+    fi
+    rm -f "$depfile"
+    return 0
+}
+
+WIFI_PKGS_ALL=""
+echo "Resolving WiFi package dependencies..."
+for pkg in $WIFI_PKGS; do
+    fetch_tcz "$pkg"
 done
+echo "WiFi packages to install: ${WIFI_PKGS_ALL}"
 
 # kexec-tools source (for 64-bit static build)
 if [ ! -f "kexec-tools-${KEXEC_VER}.tar.xz" ]; then
@@ -148,15 +202,28 @@ if [ $(whoami) != "root" ]; then
 	exec sudo $0 $*
 fi
 
-echo "Waiting for internet connection (will keep trying indefinitely)"
-echo -n "Testing example.com"
-[ -f /tmp/internet-is-up ]
-while [ $? != 0 ]; do
-	sleep 1
-	echo -n "."
-	wget --spider http://www.example.com &> /dev/null
-done
-echo > /tmp/internet-is-up
+if [ ! -f /tmp/internet-is-up ]; then
+	# Quick check: do we already have internet?
+	if wget --no-check-certificate --tries=1 -T 5 --spider \
+		http://www.example.com >/dev/null 2>&1; then
+		echo > /tmp/internet-is-up
+	elif command -v wpa_supplicant >/dev/null 2>&1; then
+		# WiFi ISO: let the user configure wireless from the menu
+		echo "No internet connection detected."
+		echo "Use the 'wifi' option in the menu to connect to a wireless network."
+	else
+		# Wired-only ISO: wait until a link comes up
+		echo "Waiting for internet connection (will keep trying indefinitely)"
+		echo -n "Testing example.com"
+		while ! wget --no-check-certificate --tries=1 -T 5 --spider \
+			http://www.example.com >/dev/null 2>&1; do
+			sleep 1
+			echo -n "."
+		done
+		echo ""
+		echo > /tmp/internet-is-up
+	fi
+fi
 
 if [ -x /tmp/nbscript.sh ]; then
 	/tmp/nbscript.sh
@@ -317,6 +384,10 @@ dd if=/dev/zero of="${WORK}/efiboot.img" bs=1M count="${IMG_SIZE}"
 mkfs.vfat -F 16 "${WORK}/efiboot.img"
 mcopy -i "${WORK}/efiboot.img" -s "${WORK}/efifiles/EFI" ::/EFI
 cp "${WORK}/efiboot.img" "${WORK}/iso/efiboot.img"
+# Also copy the EFI tree into the ISO filesystem so that Windows-based USB
+# preparation tools (which copy the filesystem rather than writing a raw image)
+# end up with a UEFI-bootable stick.
+cp -r "${WORK}/efifiles/EFI" "${WORK}/iso/"
 
 # --- Build hybrid ISO (BIOS El Torito + UEFI El Torito) ---
 # xorriso marks the alt-boot entry as EFI automatically and writes a proper
@@ -338,20 +409,53 @@ xorriso -as mkisofs \
 # --- Build wireless initrd ---
 echo "Building wireless initrd..."
 cp -a "${NBINIT}" "${WORK}/nbinit-wifi"
-# The base rootfs has lib/firmware as a symlink; firmware TCZ packages contain
-# it as a real directory.  Replace the symlink so cp -a can merge into it.
-if [ ! -d "${WORK}/nbinit-wifi/lib/firmware" ]; then
-    rm -f "${WORK}/nbinit-wifi/lib/firmware"
-    mkdir -p "${WORK}/nbinit-wifi/lib/firmware"
-fi
+# lib/firmware in corepure64 is a symlink: lib/firmware -> ../usr/local/lib/firmware
+# That target directory does not exist in the base image, so the symlink is
+# dangling.  Create the target so the symlink resolves; firmware TCZ packages
+# install to usr/local/lib/firmware/ and will then be reachable at lib/firmware/
+# where the kernel firmware loader expects them.
+mkdir -p "${WORK}/nbinit-wifi/usr/local/lib/firmware"
 if [ -e squashfs-root ]; then rm -r squashfs-root; fi
-for pkg in $WIFI_PKGS; do
+for pkg in $WIFI_PKGS_ALL; do
     if [ -s "${pkg}-x86_64.tcz" ]; then
         unsquashfs "${pkg}-x86_64.tcz"
-        cp -a squashfs-root/* "${WORK}/nbinit-wifi"
+        tar -C squashfs-root -c . | tar -C "${WORK}/nbinit-wifi" -x
         rm -r squashfs-root
     fi
 done
+
+# --- Fix wireless module visibility and regulatory database ---
+# wireless-regdb installs regulatory.db to /usr/local/share/wireless-regdb/files/
+# but cfg80211 loads it via the kernel firmware API, which searches /lib/firmware/.
+REGDB="${WORK}/nbinit-wifi/usr/local/share/wireless-regdb/files/regulatory.db"
+[ -f "$REGDB" ] && cp "$REGDB" "${WORK}/nbinit-wifi/lib/firmware/regulatory.db"
+
+# Build-time depmod cannot follow kernel.tclocal because that symlink has an
+# absolute target (/usr/local/lib/modules/…) that doesn't exist on the build
+# host.  Instead we run depmod -a inside bootsync.sh, which executes
+# synchronously during the TinyCore boot, where the symlink resolves correctly
+# to the wireless TCZ content at /usr/local/lib/modules/.
+#
+# After depmod rebuilds modules.alias we replay hardware events with
+# "udevadm trigger" so udev's MODALIAS rule (modprobe -bv $MODALIAS) picks up
+# the newly indexed drivers, then "udevadm settle" blocks until every queued
+# event — including driver loads — has finished.  All interfaces are therefore
+# present before the user reaches the netboot menu.
+cat > "${WORK}/nbinit-wifi/opt/bootsync.sh" << 'BOOTSYNC'
+#!/bin/sh
+/usr/bin/sethostname box
+depmod -a 2>/dev/null || true
+# TCZ packages install libraries to /usr/local/lib which ldconfig doesn't
+# search by default.  Register it so every TCZ binary can find its libs.
+mkdir -p /etc/ld.so.conf.d
+echo '/usr/local/lib' > /etc/ld.so.conf.d/usrlocal.conf
+ldconfig 2>/dev/null || true
+udevadm trigger --action=add 2>/dev/null
+udevadm settle --timeout=15 2>/dev/null || true
+/opt/bootlocal.sh &
+BOOTSYNC
+chmod +x "${WORK}/nbinit-wifi/opt/bootsync.sh"
+
 cd "${WORK}/nbinit-wifi"
 find . | cpio -o -H 'newc' | gzip -c > "${DONE}/nbinit4-wifi.gz"
 cd -
@@ -374,11 +478,6 @@ xorriso -as mkisofs \
     "${WORK}/iso"
 
 chown -R 1000:1000 "${DONE}"
-
-# Clean up downloaded wifi TCZ packages so the next build starts fresh.
-for pkg in $WIFI_PKGS; do
-    rm -f "${pkg}-x86_64.tcz"
-done
 
 echo ""
 echo "Build complete!"

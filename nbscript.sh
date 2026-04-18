@@ -24,6 +24,10 @@ set -e
 ## <http://www.gnu.org/copyleft/gpl.html>, on the NetbootCD site at
 ## <http://netbootcd.tuxfamily.org>, or on the CD itself.
 
+PATH=/usr/local/sbin:/usr/local/bin:$PATH
+export PATH
+export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+
 TITLE="NetbootCD Script 17.0 - April 17, 2026"
 
 # Detect UEFI mode once at startup; used throughout the script.
@@ -51,6 +55,158 @@ askforopts ()
 {
 #Extra kernel options can be useful in some cases; i.e. hardware problems, Debian preseeding, or maybe you just want to utilise your whole 1280x1024 monitor (use: vga=794).
 dialog --backtitle "$TITLE" --inputbox "Would you like to pass any extra kernel options?\n(Note: it is OK to leave this field blank)" 9 64 2>/tmp/nb-custom
+}
+
+
+wifimenu ()
+{
+	if ! command -v wpa_supplicant >/dev/null 2>&1; then
+		dialog --backtitle "$TITLE" --msgbox \
+			"WiFi tools not found.\nPlease use the WiFi-enabled ISO (NetbootCD-*-wifi.iso)." 8 57
+		return
+	fi
+
+	# Detect wireless interface - check sys/class/net first (works for DOWN interfaces too)
+	WIFI_IFACE=""
+	for _d in /sys/class/net/*/wireless; do
+		[ -d "$_d" ] && WIFI_IFACE=$(basename "$(dirname "$_d")") && break
+	done
+	if [ -z "$WIFI_IFACE" ] && command -v iw >/dev/null 2>&1; then
+		WIFI_IFACE=$(iw dev 2>/dev/null | awk '/Interface/{print $2}' | head -1)
+	fi
+
+	if [ -z "$WIFI_IFACE" ]; then
+		dialog --backtitle "$TITLE" --msgbox \
+			"No wireless interface found.\nCheck that your hardware is supported and firmware is loaded." 8 57
+		return
+	fi
+
+	ifconfig "$WIFI_IFACE" up 2>/dev/null || true
+
+	# Scan for networks
+	SSID_COUNT=0
+	if command -v iw >/dev/null 2>&1; then
+		dialog --backtitle "$TITLE" --infobox \
+			"Scanning for wireless networks on $WIFI_IFACE...\nThis may take a few seconds." 5 57
+		sleep 2
+		iw dev "$WIFI_IFACE" scan 2>/dev/null > /tmp/nb-wifiscan || true
+		# Retry once if the first scan returned nothing (card may still be initializing)
+		if [ ! -s /tmp/nb-wifiscan ]; then
+			sleep 3
+			iw dev "$WIFI_IFACE" scan 2>/dev/null > /tmp/nb-wifiscan || true
+		fi
+		awk '/^\s+SSID:/{sub(/^\s+SSID: */,""); if(length > 0) print}' /tmp/nb-wifiscan \
+			| sort -u > /tmp/nb-ssidlist 2>/dev/null || true
+		if [ -s /tmp/nb-ssidlist ]; then
+			SSID_COUNT=$(wc -l < /tmp/nb-ssidlist)
+		fi
+	else
+		touch /tmp/nb-ssidlist
+	fi
+
+	# Show networks and get SSID from user
+	if [ "$SSID_COUNT" -gt 0 ]; then
+		{
+			printf 'Wireless networks found:\n\n'
+			awk '{print NR". "$0}' /tmp/nb-ssidlist
+			printf '\nOn the next screen, enter the NUMBER of the network to connect to.\n'
+		} > /tmp/nb-ssid-info
+		dialog --backtitle "$TITLE" --textbox /tmp/nb-ssid-info 20 60
+		rm -f /tmp/nb-ssid-info
+		if ! dialog --backtitle "$TITLE" --inputbox \
+			"Enter the number of the network to connect to (1-$SSID_COUNT):" 8 57 \
+			"1" 2>/tmp/nb-wifinum; then
+			rm -f /tmp/nb-wifinum /tmp/nb-ssidlist /tmp/nb-wifiscan
+			return
+		fi
+		WIFI_NUM=$(cat /tmp/nb-wifinum)
+		rm -f /tmp/nb-wifinum
+		case "$WIFI_NUM" in
+			''|*[!0-9]*)
+				dialog --backtitle "$TITLE" --msgbox \
+					"\"$WIFI_NUM\" is not a valid number." 6 45
+				rm -f /tmp/nb-ssidlist /tmp/nb-wifiscan
+				return ;;
+		esac
+		if [ "$WIFI_NUM" -lt 1 ] || [ "$WIFI_NUM" -gt "$SSID_COUNT" ]; then
+			dialog --backtitle "$TITLE" --msgbox \
+				"Please enter a number between 1 and $SSID_COUNT." 6 50
+			rm -f /tmp/nb-ssidlist /tmp/nb-wifiscan
+			return
+		fi
+		sed -n "${WIFI_NUM}p" /tmp/nb-ssidlist > /tmp/nb-wifissid
+	else
+		if ! dialog --backtitle "$TITLE" --inputbox \
+			"No networks found. Enter SSID to connect to:" 8 57 "" \
+			2>/tmp/nb-wifissid; then
+			rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan
+			return
+		fi
+	fi
+
+	SSID=$(cat /tmp/nb-wifissid)
+	rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan
+
+	if [ -z "$SSID" ]; then return; fi
+
+	# Get password (blank = open network)
+	if ! dialog --backtitle "$TITLE" --inputbox \
+		"Password for \"$SSID\" (leave blank for open network):" 8 57 \
+		2>/tmp/nb-wifipass; then
+		rm -f /tmp/nb-wifipass
+		return
+	fi
+	WIFI_PASS=$(cat /tmp/nb-wifipass)
+	rm -f /tmp/nb-wifipass
+
+	killall wpa_supplicant 2>/dev/null || true
+	sleep 1
+
+	if [ -n "$WIFI_PASS" ]; then
+		wpa_passphrase "$SSID" "$WIFI_PASS" > /tmp/nb-wpa.conf 2>/dev/null || true
+	else
+		printf 'network={\n\tssid="%s"\n\tkey_mgmt=NONE\n}\n' "$SSID" > /tmp/nb-wpa.conf
+	fi
+
+	dialog --backtitle "$TITLE" --infobox "Connecting to \"$SSID\"..." 4 45
+	wpa_supplicant -B -i "$WIFI_IFACE" -c /tmp/nb-wpa.conf -D nl80211,wext \
+		>/tmp/nb-wpa.log 2>&1 || true
+	sleep 4
+
+	# Check association
+	CONNECTED=0
+	if command -v iw >/dev/null 2>&1; then
+		iw dev "$WIFI_IFACE" link 2>/dev/null | grep -q "SSID:" && CONNECTED=1 || true
+	else
+		# Fallback: if wpa_supplicant is still running, assume association succeeded
+		pidof wpa_supplicant >/dev/null 2>&1 && CONNECTED=1 || true
+	fi
+
+	if [ "$CONNECTED" -eq 0 ]; then
+		dialog --backtitle "$TITLE" --msgbox \
+			"Could not associate with \"$SSID\".\nCheck the password and try again." 8 57
+		return
+	fi
+
+	# Request IP via DHCP
+	dialog --backtitle "$TITLE" --infobox "Requesting IP address via DHCP..." 4 45
+	killall udhcpc 2>/dev/null || true
+	udhcpc -i "$WIFI_IFACE" -q >/dev/null 2>&1 || true
+	sleep 2
+
+	# Verify internet connectivity
+	if wget --no-check-certificate --tries=1 -T 10 --spider \
+		http://www.example.com >/dev/null 2>&1; then
+		echo > /tmp/internet-is-up
+		WIFIINFO=$(ifconfig "$WIFI_IFACE" 2>/dev/null | head -4)
+		dialog --backtitle "$TITLE" --msgbox \
+			"Connected to \"$SSID\" with internet access!\n\n${WIFIINFO}\n\nYou can now install a Linux system." \
+			15 62
+	else
+		dialog --backtitle "$TITLE" --msgbox \
+			"Associated with \"$SSID\" but internet is not reachable.\nCheck network settings and try again." \
+			9 57
+	fi
 }
 
 
@@ -345,8 +501,9 @@ $WGET $INITRDURL -O /tmp/nb-initrd
 # Proceed with interactive menu
 dialog --backtitle "$TITLE" --menu "What would you like to do?" 16 70 9 \
 install "Install a Linux system" \
-ipaddr "View/release IP address" \
-quit "Quit to prompt (do not reboot)" 2>/tmp/nb-mainmenu
+wifi    "Configure wireless network" \
+ipaddr  "View/release IP address" \
+quit    "Quit to prompt (do not reboot)" 2>/tmp/nb-mainmenu
 
 MAINMENU=$(cat /tmp/nb-mainmenu)
 rm /tmp/nb-mainmenu
@@ -358,6 +515,10 @@ true>/tmp/nb-options
 true>/tmp/nb-custom
 if [ $MAINMENU = "install" ];then
 	installmenu
+fi
+if [ $MAINMENU = "wifi" ];then
+	wifimenu
+	exec "$0" "$@"
 fi
 if [ $MAINMENU = "ipaddr" ];then
   dialog --inputbox "Network interface:" 8 30 "eth0" 2>/tmp/nb-interface
