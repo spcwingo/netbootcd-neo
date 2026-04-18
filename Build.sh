@@ -1,5 +1,5 @@
 #!/bin/bash
-#Build.sh 17.0 for netbootcd - BIOS + UEFI support (x86_64)
+#Build.sh 17.0 for netbootcd-neo - BIOS + UEFI support (x86_64)
 ## Copyright (C) 2022 Isaac Schemm <isaacschemm@gmail.com>
 ## Edited by Jonathan A. Wingo <spcwingo1@gmail.com> to support
 ## only x86_64 in either BIOS or UEFI mode.
@@ -234,7 +234,7 @@ echo "Type \"netboot\" to return to the menu."
 EOF
 chmod +x "${NBINIT}/usr/bin/netboot"
 
-# Patch tc-config (disable swap in NetbootCD)
+# Patch tc-config (disable swap in NetbootCD-Neo)
 cd "${NBINIT}/etc/init.d"
 patch -p0 < "${FDIR}/tc-config.diff" || {
     echo "WARNING: tc-config.diff did not apply cleanly."
@@ -333,7 +333,7 @@ MENU LABEL Boot from hard disk
 localboot 0x80
 
 LABEL nbcd
-menu label Start ^NetbootCD $NBCDVER
+menu label Start ^NetbootCD-Neo $NBCDVER
 menu default
 kernel /boot/vmlinuz
 initrd /boot/nbinit4.gz
@@ -355,7 +355,7 @@ insmod font
 
 search --no-floppy --file --set=root /boot/vmlinuz
 
-menuentry "Start NetbootCD $NBCDVER" {
+menuentry "Start NetbootCD-Neo $NBCDVER" {
     linux  /boot/vmlinuz quiet
     initrd /boot/nbinit4.gz
 }
@@ -402,7 +402,7 @@ xorriso -as mkisofs \
     -e efiboot.img \
     -no-emul-boot \
     -isohybrid-gpt-basdat \
-    -o "${DONE}/NetbootCD-$NBCDVER.iso" \
+    -o "${DONE}/NetbootCD-Neo-$NBCDVER.iso" \
     "${WORK}/iso"
 
 
@@ -474,12 +474,12 @@ xorriso -as mkisofs \
     -e efiboot.img \
     -no-emul-boot \
     -isohybrid-gpt-basdat \
-    -o "${DONE}/NetbootCD-$NBCDVER-wifi.iso" \
+    -o "${DONE}/NetbootCD-Neo-$NBCDVER-wifi.iso" \
     "${WORK}/iso"
 
 chown -R 1000:1000 "${DONE}"
 
 echo ""
 echo "Build complete!"
-echo "  Base ISO:     ${DONE}/NetbootCD-$NBCDVER.iso"
-echo "  Wireless ISO: ${DONE}/NetbootCD-$NBCDVER-wifi.iso"
+echo "  Base ISO:     ${DONE}/NetbootCD-Neo-$NBCDVER.iso"
+echo "  Wireless ISO: ${DONE}/NetbootCD-Neo-$NBCDVER-wifi.iso"

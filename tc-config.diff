@@ -5,6 +5,7 @@
  # (c) Robert Shingledecker 2004-2012
  # Several modifications for speed by Curaga
 +# Customized by Isaac Schemm for NetbootCD 6.x (http://netbootcd.us)
+ # Further customized by Jonathan A. Wingo for NetbootCD-Neo
  . /etc/init.d/tc-functions
  useBusybox
  
@@ -19,7 +20,7 @@
 -	/sbin/swapon -a 2>/dev/null
 -	if [ "$?" == 0 ]; then echo "${GREEN}Possible swap partition(s) enabled.${NORMAL}"; fi
 -fi
-+#don't use any swap in netbootcd
++#don't use any swap in netbootcd-neo
  
  if [ -n "$SWAPFILE" ]; then
  	wait $fstab_pid
