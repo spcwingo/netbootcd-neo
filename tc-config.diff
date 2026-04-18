@@ -5,7 +5,7 @@
  # (c) Robert Shingledecker 2004-2012
  # Several modifications for speed by Curaga
 +# Customized by Isaac Schemm for NetbootCD 6.x (http://netbootcd.us)
- # Further customized by Jonathan A. Wingo for NetbootCD-Neo
++# Further modified by Jonathan A. Wingo for NetbootCD-Neo
  . /etc/init.d/tc-functions
  useBusybox
  
