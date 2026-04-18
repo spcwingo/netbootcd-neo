@@ -62,7 +62,7 @@ wifimenu ()
 {
 	if ! command -v wpa_supplicant >/dev/null 2>&1; then
 		dialog --backtitle "$TITLE" --msgbox \
-			"WiFi tools not found.\nPlease use the WiFi-enabled ISO (NetbootCD-*-wifi.iso)." 8 57
+			"WiFi tools not found.\nPlease use the WiFi-enabled ISO (NetbootCD-Neo-*-wifi.iso)." 8 57
 		return
 	fi
 
