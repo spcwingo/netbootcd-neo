@@ -76,7 +76,7 @@ if [ ! -f "corepure64-${COREVER}.gz" ]; then
 fi
 
 # x86_64 TCZ packages (downloaded once, cached locally)
-for pkg in dialog ncursesw openssl; do
+for pkg in dialog ncursesw openssl firmware-lan; do
     if [ ! -f "${pkg}-x86_64.tcz" ]; then
         wget "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"
     fi
@@ -114,10 +114,9 @@ fetch_tcz() {
     if [ -z "$pkg" ]; then return 0; fi
     case " ${WIFI_PKGS_ALL} " in *" ${pkg} "*) return 0 ;; esac
     WIFI_PKGS_ALL="${WIFI_PKGS_ALL} ${pkg}"
-    printf '  [wifi dep] %s\n' "$pkg"
 
     if [ ! -f "${pkg}-x86_64.tcz" ]; then
-        if ! wget -q -T 15 "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"; then
+        if ! wget -T 15 "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"; then
             rm -f "${pkg}-x86_64.tcz"
             echo "WARNING: Could not download ${pkg}.tcz — skipping"
             return 0
@@ -247,7 +246,7 @@ cp -v nbscript.sh "${NBINIT}/usr/bin"
 
 # x86_64 TCZ packages
 if [ -e squashfs-root ]; then rm -r squashfs-root; fi
-for pkg in dialog ncursesw openssl; do
+for pkg in dialog ncursesw openssl firmware-lan; do
     unsquashfs "${pkg}-x86_64.tcz"
     cp -a squashfs-root/* "${NBINIT}"
     rm -r squashfs-root

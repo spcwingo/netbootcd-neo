@@ -41,10 +41,9 @@ WGET="wget --no-check-certificate --tries=3"
 
 getversion ()
 {
-	#This function reads the version the user selected from /tmp/nb-version and stores it in the VERSION variable, then deletes /tmp/nb-version.
 	VERSION=$(cat /tmp/nb-version)
-	if [ $VERSION = "Manual" ];then
-		dialog --backtitle "$TITLE" --inputbox "Specify your preferred version here.\nFor Ubuntu and Debian, use the codename. For other distributions, use the version number." 11 54 2>/tmp/nb-version
+	if [ "$VERSION" = "Manual" ]; then
+		dialog --backtitle "$TITLE" --inputbox "Specify your preferred version here.\nFor Ubuntu and Debian, use the codename. For other distributions, use the version number." 11 54 2>/tmp/nb-version || { rm -f /tmp/nb-version; return 1; }
 		VERSION=$(cat /tmp/nb-version)
 	fi
 	rm /tmp/nb-version
@@ -54,7 +53,7 @@ getversion ()
 askforopts ()
 {
 #Extra kernel options can be useful in some cases; i.e. hardware problems, Debian preseeding, or maybe you just want to utilise your whole 1280x1024 monitor (use: vga=794).
-dialog --backtitle "$TITLE" --inputbox "Would you like to pass any extra kernel options?\n(Note: it is OK to leave this field blank)" 9 64 2>/tmp/nb-custom
+dialog --backtitle "$TITLE" --inputbox "Would you like to pass any extra kernel options?\n(Note: it is OK to leave this field blank)" 9 64 2>/tmp/nb-custom || true
 }
 
 
@@ -106,42 +105,29 @@ wifimenu ()
 
 	# Show networks and get SSID from user
 	if [ "$SSID_COUNT" -gt 0 ]; then
-		{
-			printf 'Wireless networks found:\n\n'
-			awk '{print NR". "$0}' /tmp/nb-ssidlist
-			printf '\nOn the next screen, enter the NUMBER of the network to connect to.\n'
-		} > /tmp/nb-ssid-info
-		dialog --backtitle "$TITLE" --textbox /tmp/nb-ssid-info 20 60
-		rm -f /tmp/nb-ssid-info
-		if ! dialog --backtitle "$TITLE" --inputbox \
-			"Enter the number of the network to connect to (1-$SSID_COUNT):" 8 57 \
-			"1" 2>/tmp/nb-wifinum; then
-			rm -f /tmp/nb-wifinum /tmp/nb-ssidlist /tmp/nb-wifiscan
-			return
+		set --
+		i=1
+		while IFS= read -r ssid; do
+			set -- "$@" "$i" "$ssid"
+			i=$((i+1))
+		done < /tmp/nb-ssidlist
+		set -- "$@" "manual" "Enter SSID manually"
+		dialog --backtitle "$TITLE" --menu \
+			"Select a wireless network (use arrow keys):" 20 70 13 \
+			"$@" 2>/tmp/nb-wifisel || { rm -f /tmp/nb-wifisel /tmp/nb-ssidlist /tmp/nb-wifiscan; return; }
+		WIFI_SEL=$(cat /tmp/nb-wifisel)
+		rm -f /tmp/nb-wifisel
+		if [ "$WIFI_SEL" = "manual" ]; then
+			dialog --backtitle "$TITLE" --inputbox \
+				"Enter SSID to connect to:" 8 57 "" \
+				2>/tmp/nb-wifissid || { rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; }
+		else
+			sed -n "${WIFI_SEL}p" /tmp/nb-ssidlist > /tmp/nb-wifissid
 		fi
-		WIFI_NUM=$(cat /tmp/nb-wifinum)
-		rm -f /tmp/nb-wifinum
-		case "$WIFI_NUM" in
-			''|*[!0-9]*)
-				dialog --backtitle "$TITLE" --msgbox \
-					"\"$WIFI_NUM\" is not a valid number." 6 45
-				rm -f /tmp/nb-ssidlist /tmp/nb-wifiscan
-				return ;;
-		esac
-		if [ "$WIFI_NUM" -lt 1 ] || [ "$WIFI_NUM" -gt "$SSID_COUNT" ]; then
-			dialog --backtitle "$TITLE" --msgbox \
-				"Please enter a number between 1 and $SSID_COUNT." 6 50
-			rm -f /tmp/nb-ssidlist /tmp/nb-wifiscan
-			return
-		fi
-		sed -n "${WIFI_NUM}p" /tmp/nb-ssidlist > /tmp/nb-wifissid
 	else
-		if ! dialog --backtitle "$TITLE" --inputbox \
+		dialog --backtitle "$TITLE" --inputbox \
 			"No networks found. Enter SSID to connect to:" 8 57 "" \
-			2>/tmp/nb-wifissid; then
-			rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan
-			return
-		fi
+			2>/tmp/nb-wifissid || { rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; }
 	fi
 
 	SSID=$(cat /tmp/nb-wifissid)
@@ -150,12 +136,9 @@ wifimenu ()
 	if [ -z "$SSID" ]; then return; fi
 
 	# Get password (blank = open network)
-	if ! dialog --backtitle "$TITLE" --inputbox \
+	dialog --backtitle "$TITLE" --inputbox \
 		"Password for \"$SSID\" (leave blank for open network):" 8 57 \
-		2>/tmp/nb-wifipass; then
-		rm -f /tmp/nb-wifipass
-		return
-	fi
+		2>/tmp/nb-wifipass || { rm -f /tmp/nb-wifipass; return; }
 	WIFI_PASS=$(cat /tmp/nb-wifipass)
 	rm -f /tmp/nb-wifipass
 
@@ -212,7 +195,6 @@ wifimenu ()
 
 installmenu ()
 {
-#Ask the user to choose a distro, save the choice to /tmp/nb-distro
 dialog --backtitle "$TITLE" --menu "Choose a distribution:" 20 70 13 \
 ubuntu "Ubuntu [d-i]" \
 debian "Debian GNU/Linux" \
@@ -227,20 +209,16 @@ rhel-type-8 "AlmaLinux 8 / CentOS 8 / Rocky Linux 8" \
 rhel-type-7 "CentOS 7 and Scientific Linux 7" \
 rhel-type-6 "CentOS 6 and Scientific Linux 6" \
 arch "Arch Linux" \
-slackware "Slackware" 2>/tmp/nb-distro
-#Read their choice, save it, and delete the old file
+slackware "Slackware" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
-#Now to check which distro the user picked.
 if [ $DISTRO = "ubuntu" ];then
-	#Ask about version
 	dialog --menu "Choose a system to install:" 20 70 13 \
 	focal "Ubuntu 20.04 LTS" \
 	bionic "Ubuntu 18.04 LTS" \
 	xenial "Ubuntu 16.04 LTS" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	#Run the getversion() function above
-	getversion
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 
 	#Set the URL to download the kernel and initrd from. The server used here is archive.ubuntu.com.
 	KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
@@ -271,8 +249,8 @@ if [ $DISTRO = "debian" ];then
 	jessie "Debian 8" \
 	stable "Debian stable" \
 	testing "Debian testing" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	KERNELURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -281,8 +259,8 @@ if [ $DISTRO = "debiandaily" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	high "Default" \
 	medium "Show installation menu" \
-	low "Expert mode" 2>/tmp/nb-version
-	getversion
+	low "Expert mode" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	KERNELURL="http://d-i.debian.org/daily-images/amd64/daily/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://d-i.debian.org/daily-images/amd64/daily/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -294,8 +272,8 @@ if [ $DISTRO = "devuan" ];then
 	daedalus "Devuan daedalus" \
 	chimaera "Devuan chimaera" \
 	ceres "Devuan ceres" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	KERNELURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -306,10 +284,9 @@ if [ $DISTRO = "fedora" ];then
 	releases/42/Server "Fedora 42" \
 	releases/41/Server "Fedora 41" \
 	development/rawhide "Rawhide" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	getversion
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
-	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os/" 2>/tmp/nb-server
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	KERNELURL="$(cat /tmp/nb-server)/images/pxeboot/vmlinuz"
 	INITRDURL="$(cat /tmp/nb-server)/images/pxeboot/initrd.img"
 	echo -n "inst.stage2=$(cat /tmp/nb-server)" >>/tmp/nb-options
@@ -323,18 +300,15 @@ if [ $DISTRO = "opensuse" ];then
 	leap/15.5 "openSUSE Leap 15.5" \
 	leap/15.4 "openSUSE Leap 15.4" \
 	leap/15.3 "openSUSE Leap 15.3" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	getversion
-	#All versions of openSUSE are in the "distribution" folder, except for factory/tumbleweed.
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	if [ $VERSION != "tumbleweed" ];then
 		VERSION=distribution/$VERSION
 	fi
 	KERNELURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/linux"
 	INITRDURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/initrd"
-	#These options are common to openSUSE.
 	echo -n 'splash=silent showopts '>>/tmp/nb-options
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
-	dialog --inputbox "Where do you want to install openSUSE from?" 8 70 http://download.opensuse.org/$VERSION/repo/oss 2>/tmp/nb-server
+	dialog --inputbox "Where do you want to install openSUSE from?" 8 70 http://download.opensuse.org/$VERSION/repo/oss 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	echo -n "install=$(cat /tmp/nb-server)" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
@@ -343,8 +317,8 @@ if [ $DISTRO = "mageia" ];then
 	9 "Mageia 9" \
 	8 "Mageia 8" \
 	cauldron "Mageia cauldron" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	KERNELURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/vmlinuz"
 	INITRDURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/all.rdz"
 	echo -n 'automatic=method:http' >>/tmp/nb-options
@@ -354,19 +328,18 @@ if [ $DISTRO = "rhel-type-10" ];then
 	a_10 "Latest version of AlmaLinux 10" \
 	c_10-stream "Latest version of CentOS Stream 10" \
 	r_10 "Latest version of Rocky Linux 10" \
-	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
 	if [ $TYPE = a ];then
-		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = c ];then
-		dialog --inputbox "Where do you want to install CentOS Stream from?" 8 70 "https://ftp-chi.osuosl.org/pub/centos-stream/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install CentOS Stream from?" 8 70 "https://ftp-chi.osuosl.org/pub/centos-stream/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = r ];then
-		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
-		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	fi
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
@@ -380,19 +353,18 @@ if [ $DISTRO = "rhel-type-9" ];then
 	a_9 "Latest version of AlmaLinux 9" \
 	c_9-stream "Latest version of CentOS Stream 9" \
 	r_9 "Latest version of Rocky Linux 9" \
-	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
 	if [ $TYPE = a ];then
-		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = c ];then
-		dialog --inputbox "Where do you want to install CentOS Stream from?" 8 70 "https://ftp-chi.osuosl.org/pub/centos-stream/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install CentOS Stream from?" 8 70 "https://ftp-chi.osuosl.org/pub/centos-stream/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = r ];then
-		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
-		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	fi
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
@@ -406,19 +378,18 @@ if [ $DISTRO = "rhel-type-8" ];then
 	a_8 "Latest version of AlmaLinux 8" \
 	c_8 "Latest version of CentOS 8" \
 	r_8 "Latest version of Rocky Linux 8" \
-	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
 	if [ $TYPE = a ];then
-		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = c ];then
-		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = r ];then
-		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
-		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	fi
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
@@ -431,15 +402,14 @@ if [ $DISTRO = "rhel-type-7" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	c_7 "Latest version of CentOS 7" \
 	s_7x "Latest version of Scientific Linux 7" \
-	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
 	if [ $TYPE = s ];then
-		dialog --inputbox "Where do you want to install Scientific Linux from?" 8 70 "ftp://linux1.fnal.gov/linux/scientific/$VERSION/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install Scientific Linux from?" 8 70 "ftp://linux1.fnal.gov/linux/scientific/$VERSION/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
-		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/os/x86_64" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/os/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	fi
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
@@ -452,15 +422,14 @@ if [ $DISTRO = "rhel-type-6" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	c_6 "Latest version of CentOS 6" \
 	s_6x "Latest version of Scientific Linux 6" \
-	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	#Ask the user which server to use (the installer doesn't have a built-in list like Ubuntu and Debian do.)
 	if [ $TYPE = s ];then
-		dialog --inputbox "Where do you want to install Scientific Linux from?" 8 70 "ftp://linux1.fnal.gov/linux/scientific/$VERSION/x86_64/os" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install Scientific Linux from?" 8 70 "ftp://linux1.fnal.gov/linux/scientific/$VERSION/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
-		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/os/x86_64" 2>/tmp/nb-server
+		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/os/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	fi
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
@@ -471,8 +440,8 @@ if [ $DISTRO = "rhel-type-6" ];then
 fi
 if [ $DISTRO = "arch" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	latest "Arch x86_64" 2>/tmp/nb-version
-	getversion
+	latest "Arch x86_64" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	KERNELURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/vmlinuz-linux"
 	INITRDURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/initramfs-linux.img"
 	echo -n 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
@@ -481,11 +450,11 @@ if [ $DISTRO = "slackware" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	slackware64-15.0 "Slackware 15.0" \
 	slackware64-14.2 "Slackware 14.2" \
-	Manual "Manually enter a version to install" 2>/tmp/nb-version
-	getversion
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
 	dialog --backtitle "$TITLE" --menu "Choose a kernel type:" 20 70 13 \
 	huge.s "" \
-	hugesmp.s "" 2>/tmp/nb-kerntype
+	hugesmp.s "" 2>/tmp/nb-kerntype || { rm -f /tmp/nb-kerntype; return; }
 	KERNTYPE=$(cat /tmp/nb-kerntype)
 	rm /tmp/nb-kerntype
 	KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/$KERNTYPE/bzImage"
@@ -499,43 +468,45 @@ $WGET $INITRDURL -O /tmp/nb-initrd
 
 
 # Proceed with interactive menu
-dialog --backtitle "$TITLE" --menu "What would you like to do?" 16 70 9 \
-install "Install a Linux system" \
-wifi    "Configure wireless network" \
-ipaddr  "View/release IP address" \
-quit    "Quit to prompt (do not reboot)" 2>/tmp/nb-mainmenu
-
-MAINMENU=$(cat /tmp/nb-mainmenu)
-rm /tmp/nb-mainmenu
-if [ $MAINMENU = quit ];then
-	exit 1
-fi
-#We are going to need /tmp/nb-options empty later.
-true>/tmp/nb-options
-true>/tmp/nb-custom
-if [ $MAINMENU = "install" ];then
-	installmenu
-fi
-if [ $MAINMENU = "wifi" ];then
-	wifimenu
-	exec "$0" "$@"
-fi
-if [ $MAINMENU = "ipaddr" ];then
-  dialog --inputbox "Network interface:" 8 30 "eth0" 2>/tmp/nb-interface
-  ifconfig $(cat /tmp/nb-interface)
-  answer="invalid"
-  while [ $? == 0 ];do
-    read -p "Release IP address with \"killall -SIGUSR2 udhcpc\"? (Y/n) " answer
-    if [ "$answer" == y ] || [ "$answer" == "" ];then
-      killall -SIGUSR2 udhcpc
-      echo "Released IP address."
-      break
-    elif [ "$answer" == n ];then
-      break
-    fi
-  done
-  exit
-fi
+while true; do
+	dialog --backtitle "$TITLE" --menu "What would you like to do?" 16 70 9 \
+	install "Install a Linux system" \
+	wifi    "Configure wireless network" \
+	ipaddr  "View/release IP address" \
+	quit    "Quit to prompt (do not reboot)" 2>/tmp/nb-mainmenu || { rm -f /tmp/nb-mainmenu; continue; }
+	MAINMENU=$(cat /tmp/nb-mainmenu)
+	rm /tmp/nb-mainmenu
+	if [ "$MAINMENU" = quit ]; then
+		exit 1
+	fi
+	if [ "$MAINMENU" = "install" ]; then
+		true>/tmp/nb-options
+		true>/tmp/nb-custom
+		installmenu
+		if [ -f /tmp/nb-linux ]; then break; fi
+		continue
+	fi
+	if [ "$MAINMENU" = "wifi" ]; then
+		wifimenu
+		exec "$0" "$@"
+	fi
+	if [ "$MAINMENU" = "ipaddr" ]; then
+		dialog --inputbox "Network interface:" 8 30 "eth0" 2>/tmp/nb-interface
+		ifconfig $(cat /tmp/nb-interface)
+		answer="invalid"
+		while [ $? == 0 ]; do
+			read -p "Release IP address with \"killall -SIGUSR2 udhcpc\"? (Y/n) " answer
+			if [ "$answer" == y ] || [ "$answer" == "" ]; then
+				killall -SIGUSR2 udhcpc
+				echo "Released IP address."
+				break
+			elif [ "$answer" == n ]; then
+				break
+			fi
+		done
+		exit
+	fi
+done
 #This is what we will tell kexec.
 if [ $DISTRO != "grub4dos" ];then
 	ARGS="-l /tmp/nb-linux --initrd=/tmp/nb-initrd $OPTIONS $CUSTOM"
