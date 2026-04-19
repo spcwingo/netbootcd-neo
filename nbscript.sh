@@ -196,10 +196,42 @@ wifimenu ()
 
 ipadrmenu ()
 {
-	dialog --backtitle "$TITLE" --inputbox "Network interface:" 8 30 "eth0" \
-		2>/tmp/nb-interface || { rm -f /tmp/nb-interface; return 0; }
-	IFACE=$(cat /tmp/nb-interface) || true
-	rm -f /tmp/nb-interface
+	# Enumerate network interfaces from /sys/class/net (skip loopback and tunnels)
+	IFACE_COUNT=0
+	set --
+	for _iface in /sys/class/net/*; do
+		_name=$(basename "$_iface")
+		[ "$_name" = "lo" ] && continue
+		[ -f "$_iface/tun_flags" ] && continue
+		_type=$(cat "$_iface/type" 2>/dev/null)
+		[ "$_type" != "1" ] && continue
+		case "$_name" in dummy*) continue;; esac
+		_state=$(cat "$_iface/operstate" 2>/dev/null || echo "unknown")
+		set -- "$@" "$_name" "[$_state]"
+		IFACE_COUNT=$((IFACE_COUNT+1))
+	done
+
+	if [ "$IFACE_COUNT" -gt 0 ]; then
+		set -- "$@" "manual" "Enter interface name manually"
+		dialog --backtitle "$TITLE" --menu \
+			"Select a network interface (use arrow keys):" 20 50 13 \
+			"$@" 2>/tmp/nb-ifsel || { rm -f /tmp/nb-ifsel; return 0; }
+		IFACE_SEL=$(cat /tmp/nb-ifsel)
+		rm -f /tmp/nb-ifsel
+		if [ "$IFACE_SEL" = "manual" ]; then
+			dialog --backtitle "$TITLE" --inputbox "Network interface:" 8 30 "" \
+				2>/tmp/nb-interface || { rm -f /tmp/nb-interface; return 0; }
+			IFACE=$(cat /tmp/nb-interface) || true
+			rm -f /tmp/nb-interface
+		else
+			IFACE="$IFACE_SEL"
+		fi
+	else
+		dialog --backtitle "$TITLE" --inputbox "Network interface:" 8 30 "eth0" \
+			2>/tmp/nb-interface || { rm -f /tmp/nb-interface; return 0; }
+		IFACE=$(cat /tmp/nb-interface) || true
+		rm -f /tmp/nb-interface
+	fi
 	IFINFO=$(ifconfig "$IFACE" 2>&1) || true
 	dialog --backtitle "$TITLE" --msgbox "$IFINFO" 15 70 || true
 	dialog --backtitle "$TITLE" --yesno \
