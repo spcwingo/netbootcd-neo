@@ -193,6 +193,33 @@ wifimenu ()
 }
 
 
+
+ipadrmenu ()
+{
+	dialog --backtitle "$TITLE" --inputbox "Network interface:" 8 30 "eth0" \
+		2>/tmp/nb-interface || { rm -f /tmp/nb-interface; return 0; }
+	IFACE=$(cat /tmp/nb-interface) || true
+	rm -f /tmp/nb-interface
+	IFINFO=$(ifconfig "$IFACE" 2>&1) || true
+	dialog --backtitle "$TITLE" --msgbox "$IFINFO" 15 70 || true
+	dialog --backtitle "$TITLE" --yesno \
+		"Release IP address on $IFACE?" 6 45 || return 0
+	killall -SIGUSR2 udhcpc 2>/dev/null || true
+	dialog --backtitle "$TITLE" --msgbox \
+		"IP address on $IFACE released." 5 45 || true
+	dialog --backtitle "$TITLE" --yesno \
+		"Request a new IP address via DHCP?" 6 50 || return 0
+	dialog --backtitle "$TITLE" --infobox \
+		"Requesting IP address via DHCP on $IFACE..." 4 52 || true
+	udhcpc -i "$IFACE" -q >/dev/null 2>&1 || true
+	sleep 2
+	IFINFO=$(ifconfig "$IFACE" 2>&1) || true
+	dialog --backtitle "$TITLE" --msgbox \
+		"Done.\n\n$IFINFO" 15 70 || true
+	return 0
+}
+
+
 installmenu ()
 {
 dialog --backtitle "$TITLE" --menu "Choose a distribution:" 20 70 13 \
@@ -491,20 +518,8 @@ while true; do
 		exec "$0" "$@"
 	fi
 	if [ "$MAINMENU" = "ipaddr" ]; then
-		dialog --inputbox "Network interface:" 8 30 "eth0" 2>/tmp/nb-interface
-		ifconfig $(cat /tmp/nb-interface)
-		answer="invalid"
-		while [ $? == 0 ]; do
-			read -p "Release IP address with \"killall -SIGUSR2 udhcpc\"? (Y/n) " answer
-			if [ "$answer" == y ] || [ "$answer" == "" ]; then
-				killall -SIGUSR2 udhcpc
-				echo "Released IP address."
-				break
-			elif [ "$answer" == n ]; then
-				break
-			fi
-		done
-		exit
+		ipadrmenu || true
+		continue
 	fi
 done
 #This is what we will tell kexec.
