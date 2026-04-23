@@ -43,8 +43,9 @@ getversion ()
 {
 	VERSION=$(cat /tmp/nb-version)
 	if [ "$VERSION" = "Manual" ]; then
-		dialog --backtitle "$TITLE" --inputbox "Specify your preferred version here.\nFor Ubuntu and Debian, use the codename. For other distributions, use the version number." 11 54 2>/tmp/nb-version || { rm -f /tmp/nb-version; return 1; }
-		VERSION=$(cat /tmp/nb-version)
+		printf 'Version (codename for Debian/Ubuntu, number for others): '
+		read VERSION
+		if [ -z "$VERSION" ]; then rm -f /tmp/nb-version; return 1; fi
 	fi
 	rm /tmp/nb-version
 }
@@ -53,7 +54,12 @@ getversion ()
 askforopts ()
 {
 #Extra kernel options can be useful in some cases; i.e. hardware problems, Debian preseeding, or maybe you just want to utilise your whole 1280x1024 monitor (use: vga=794).
-dialog --backtitle "$TITLE" --inputbox "Would you like to pass any extra kernel options?\n(Note: it is OK to leave this field blank)" 9 64 2>/tmp/nb-custom || true
+# dialog --inputbox is unreliable on BusyBox-based systems (TinyCore); use --yesno + read instead.
+if dialog --backtitle "$TITLE" --defaultno --yesno "Would you like to pass extra kernel parameters to the new kernel?" 6 60; then
+	printf 'Extra kernel parameters: '
+	read NB_CUSTOM
+	printf '%s' "$NB_CUSTOM" >/tmp/nb-custom
+fi
 }
 
 
@@ -118,16 +124,18 @@ wifimenu ()
 		WIFI_SEL=$(cat /tmp/nb-wifisel)
 		rm -f /tmp/nb-wifisel
 		if [ "$WIFI_SEL" = "manual" ]; then
-			dialog --backtitle "$TITLE" --inputbox \
-				"Enter SSID to connect to:" 8 57 "" \
-				2>/tmp/nb-wifissid || { rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; }
+			printf 'SSID: '
+			read _SSID
+			if [ -z "$_SSID" ]; then rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; fi
+			printf '%s' "$_SSID" >/tmp/nb-wifissid
 		else
 			sed -n "${WIFI_SEL}p" /tmp/nb-ssidlist > /tmp/nb-wifissid
 		fi
 	else
-		dialog --backtitle "$TITLE" --inputbox \
-			"No networks found. Enter SSID to connect to:" 8 57 "" \
-			2>/tmp/nb-wifissid || { rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; }
+		printf 'No networks found. SSID: '
+		read _SSID
+		if [ -z "$_SSID" ]; then rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; fi
+		printf '%s' "$_SSID" >/tmp/nb-wifissid
 	fi
 
 	SSID=$(cat /tmp/nb-wifissid)
@@ -136,11 +144,8 @@ wifimenu ()
 	if [ -z "$SSID" ]; then return; fi
 
 	# Get password (blank = open network)
-	dialog --backtitle "$TITLE" --inputbox \
-		"Password for \"$SSID\" (leave blank for open network):" 8 57 \
-		2>/tmp/nb-wifipass || { rm -f /tmp/nb-wifipass; return; }
-	WIFI_PASS=$(cat /tmp/nb-wifipass)
-	rm -f /tmp/nb-wifipass
+	printf 'Password for "%s" (leave blank for open network): ' "$SSID"
+	read WIFI_PASS
 
 	killall wpa_supplicant 2>/dev/null || true
 	sleep 1
@@ -183,7 +188,7 @@ wifimenu ()
 		echo > /tmp/internet-is-up
 		WIFIINFO=$(ifconfig "$WIFI_IFACE" 2>/dev/null | head -4)
 		dialog --backtitle "$TITLE" --msgbox \
-			"Connected to \"$SSID\" with internet access!\n\n${WIFIINFO}\n\nYou can now install a Linux system." \
+			"Connected to \"$SSID\" with internet access!\n\n${WIFIINFO}\n\nYou can now install or boot a Linux system." \
 			15 62
 	else
 		dialog --backtitle "$TITLE" --msgbox \
@@ -219,18 +224,16 @@ ipadrmenu ()
 		IFACE_SEL=$(cat /tmp/nb-ifsel)
 		rm -f /tmp/nb-ifsel
 		if [ "$IFACE_SEL" = "manual" ]; then
-			dialog --backtitle "$TITLE" --inputbox "Network interface:" 8 30 "" \
-				2>/tmp/nb-interface || { rm -f /tmp/nb-interface; return 0; }
-			IFACE=$(cat /tmp/nb-interface) || true
-			rm -f /tmp/nb-interface
+			printf 'Network interface: '
+			read IFACE
+			if [ -z "$IFACE" ]; then return 0; fi
 		else
 			IFACE="$IFACE_SEL"
 		fi
 	else
-		dialog --backtitle "$TITLE" --inputbox "Network interface:" 8 30 "eth0" \
-			2>/tmp/nb-interface || { rm -f /tmp/nb-interface; return 0; }
-		IFACE=$(cat /tmp/nb-interface) || true
-		rm -f /tmp/nb-interface
+		printf 'Network interface [eth0]: '
+		read IFACE
+		IFACE="${IFACE:-eth0}"
 	fi
 	IFINFO=$(ifconfig "$IFACE" 2>&1) || true
 	dialog --backtitle "$TITLE" --msgbox "$IFINFO" 15 70 || true
@@ -254,11 +257,15 @@ ipadrmenu ()
 
 installmenu ()
 {
-dialog --backtitle "$TITLE" --menu "Choose a distribution:" 20 70 13 \
+dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 17 \
 ubuntu "Ubuntu [d-i]" \
 debian "Debian GNU/Linux" \
 debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
+kali "Kali Linux" \
+lmde "Linux Mint Debian Edition" \
+sparky "Sparky Linux" \
+debian-live "Debian 13 Live" \
 fedora "Fedora" \
 opensuse "openSUSE" \
 mageia "Mageia" \
@@ -267,35 +274,56 @@ rhel-type-9 "AlmaLinux 9 / CentOS 9-Stream / Rocky Linux 9" \
 rhel-type-8 "AlmaLinux 8 / CentOS 8 / Rocky Linux 8" \
 rhel-type-7 "CentOS 7 and Scientific Linux 7" \
 rhel-type-6 "CentOS 6 and Scientific Linux 6" \
+openeuler "openEuler" \
 arch "Arch Linux" \
-slackware "Slackware" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
+alpine "Alpine Linux" \
+nixos "NixOS" \
+slackware "Slackware" \
+mint "Linux Mint" \
+ubuntu-live "Ubuntu-based live distros" \
+flatcar "Flatcar Container Linux" \
+rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
 if [ $DISTRO = "ubuntu" ];then
-	dialog --menu "Choose a system to install:" 20 70 13 \
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	resolute "Ubuntu 26.04 LTS (Subiquity)" \
+	noble "Ubuntu 24.04 LTS (Subiquity)" \
+	jammy "Ubuntu 22.04 LTS" \
 	focal "Ubuntu 20.04 LTS" \
 	bionic "Ubuntu 18.04 LTS" \
 	xenial "Ubuntu 16.04 LTS" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return
-
-	#Set the URL to download the kernel and initrd from. The server used here is archive.ubuntu.com.
-	KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
-	INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/initrd.gz"
-	# Test if distro-updates exists
-	if ! $WGET --spider -q $KERNELURL; then # fallback to known distro
-		KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
-		INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/initrd.gz"
-	fi
-	if ! $WGET --spider -q $KERNELURL; then # try new path
-		KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/linux"
-		INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/initrd.gz"
-	fi
-	#These options are good for all Ubuntu installers.
-	echo -n 'vga=normal quiet '>>/tmp/nb-options
-	#If the user wants a command-line install, then add some more kernel arguments. The CLI install is akin to "standard system" in Debian.
-	if dialog --yesno "Would you like to install language packs?\n(Choose no for a command-line system.)" 7 43;then
-		echo -n 'tasks=standard pkgsel/language-pack-patterns= pkgsel/install-language-support=false'>>/tmp/nb-options
+	if [ "$VERSION" = "noble" ] || [ "$VERSION" = "resolute" ]; then
+		KERNELURL="https://releases.ubuntu.com/$VERSION/netboot/amd64/linux"
+		INITRDURL="https://releases.ubuntu.com/$VERSION/netboot/amd64/initrd"
+		case "$VERSION" in
+			noble)    ISODEFAULT="https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso" ;;
+			resolute) ISODEFAULT="https://releases.ubuntu.com/26.04/ubuntu-26.04-live-server-amd64.iso" ;;
+		esac
+		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu live-server ISO:" 8 70 "$ISODEFAULT" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
+		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl)" >>/tmp/nb-options
+		rm /tmp/nb-isourl
+	else
+		#Set the URL to download the kernel and initrd from. The server used here is archive.ubuntu.com.
+		KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
+		INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/initrd.gz"
+		# Test if distro-updates exists
+		if ! $WGET --spider -q $KERNELURL; then # fallback to known distro
+			KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
+			INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/initrd.gz"
+		fi
+		if ! $WGET --spider -q $KERNELURL; then # try new path
+			KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/linux"
+			INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/initrd.gz"
+		fi
+		#These options are good for all Ubuntu installers.
+		echo -n 'vga=normal quiet '>>/tmp/nb-options
+		#If the user wants a command-line install, then add some more kernel arguments. The CLI install is akin to "standard system" in Debian.
+		if dialog --yesno "Would you like to install language packs?\n(Choose no for a command-line system.)" 7 43;then
+			echo -n 'tasks=standard pkgsel/language-pack-patterns= pkgsel/install-language-support=false'>>/tmp/nb-options
+		fi
 	fi
 fi
 if [ $DISTRO = "debian" ];then
@@ -337,6 +365,63 @@ if [ $DISTRO = "devuan" ];then
 	INITRDURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
 fi
+if [ $DISTRO = "kali" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	kali-rolling "Kali Linux Rolling" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	KERNELURL="https://http.kali.org/kali/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
+	INITRDURL="https://http.kali.org/kali/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
+	echo -n 'vga=normal quiet '>>/tmp/nb-options
+fi
+if [ $DISTRO = "lmde" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to boot:" 20 70 13 \
+	6 "LMDE 6 Cinnamon" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6-dc29210f"
+	KERNELURL="$BASE/vmlinuz"
+	INITRDURL="$BASE/initrd"
+	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
+fi
+if [ $DISTRO = "sparky" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to boot:" 20 70 13 \
+	rolling-xfce "Sparky Rolling XFCE (Mar 2026)" \
+	rolling-lxqt "Sparky Rolling LXQt (Mar 2026)" \
+	stable "Sparky Stable 8.2 XFCE" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	case "$VERSION" in
+		rolling-xfce) BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.03-314f0a50" ;;
+		rolling-lxqt) BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.03-1a7f6c6a" ;;
+		stable)       BASE="https://github.com/netbootxyz/debian-squash/releases/download/8.2-28fbf253" ;;
+	esac
+	KERNELURL="$BASE/vmlinuz"
+	INITRDURL="$BASE/initrd"
+	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
+fi
+if [ $DISTRO = "debian-live" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a desktop environment:" 20 70 13 \
+	xfce     "Debian 13 Live - XFCE" \
+	kde      "Debian 13 Live - KDE" \
+	gnome    "Debian 13 Live - GNOME" \
+	cinnamon "Debian 13 Live - Cinnamon" \
+	mate     "Debian 13 Live - MATE" \
+	lxde     "Debian 13 Live - LXDE" \
+	lxqt     "Debian 13 Live - LXQt" \
+	core     "Debian 13 Live - Standard (no desktop)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	KERNELURL="https://github.com/netbootxyz/debian-core-13/releases/download/13.4.0-0a426450/vmlinuz"
+	INITRDURL="https://github.com/netbootxyz/debian-core-13/releases/download/13.4.0-0a426450/initrd"
+	case "$VERSION" in
+		xfce)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-5048a26b/filesystem.squashfs" ;;
+		kde)      SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-c5f83616/filesystem.squashfs" ;;
+		gnome)    SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-0aea8fe2/filesystem.squashfs" ;;
+		cinnamon) SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-f213be8c/filesystem.squashfs" ;;
+		mate)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-8a7bb188/filesystem.squashfs" ;;
+		lxde)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-79e9a15b/filesystem.squashfs" ;;
+		lxqt)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-6088759b/filesystem.squashfs" ;;
+		core)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-9d9b777e/filesystem.squashfs" ;;
+	esac
+	echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
+fi
 if [ $DISTRO = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
  releases/43/Server "Fedora 43" \
@@ -354,6 +439,7 @@ fi
 if [ $DISTRO = "opensuse" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	tumbleweed "openSUSE Tumbleweed" \
+	slowroll "openSUSE Slowroll" \
 	leap/16.0 "openSUSE Leap 16.0" \
 	leap/15.6 "openSUSE Leap 15.6" \
 	leap/15.5 "openSUSE Leap 15.5" \
@@ -361,13 +447,13 @@ if [ $DISTRO = "opensuse" ];then
 	leap/15.3 "openSUSE Leap 15.3" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return
-	if [ $VERSION != "tumbleweed" ];then
+	if [ $VERSION != "tumbleweed" ] && [ $VERSION != "slowroll" ];then
 		VERSION=distribution/$VERSION
 	fi
 	KERNELURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/linux"
 	INITRDURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/initrd"
 	echo -n 'splash=silent showopts '>>/tmp/nb-options
-	dialog --inputbox "Where do you want to install openSUSE from?" 8 70 http://download.opensuse.org/$VERSION/repo/oss 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	dialog --inputbox "Where do you want to install openSUSE from?" 8 70 "http://download.opensuse.org/$VERSION/repo/oss" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	echo -n "install=$(cat /tmp/nb-server)" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
@@ -403,9 +489,8 @@ if [ $DISTRO = "rhel-type-10" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
-	echo -n "nomodeset inst.repo=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
-	askforopts
 fi
 if [ $DISTRO = "rhel-type-9" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -428,9 +513,8 @@ if [ $DISTRO = "rhel-type-9" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "nomodeset inst.repo=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
-	askforopts
 fi
 if [ $DISTRO = "rhel-type-8" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -453,9 +537,8 @@ if [ $DISTRO = "rhel-type-8" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "nomodeset inst.repo=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
-	askforopts
 fi
 if [ $DISTRO = "rhel-type-7" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -473,9 +556,8 @@ if [ $DISTRO = "rhel-type-7" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "xdriver=vesa nomodeset repo=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	echo -n "xdriver=vesa nomodeset repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
-	askforopts
 fi
 if [ $DISTRO = "rhel-type-6" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -493,9 +575,23 @@ if [ $DISTRO = "rhel-type-6" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "ide=nodma method=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	echo -n "ide=nodma method=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
-	askforopts
+fi
+if [ $DISTRO = "openeuler" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	24.03-LTS-SP1 "openEuler 24.03 LTS SP1" \
+	24.03-LTS "openEuler 24.03 LTS" \
+	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
+	25.03 "openEuler 25.03" \
+	Manual "Manually enter a version to install (e.g. 24.03-LTS)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	dialog --inputbox "Where do you want to install openEuler from?" 8 70 "https://repo.openeuler.org/openEuler-$VERSION/everything/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	SERVER=$(cat /tmp/nb-server)
+	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
+	INITRDURL="$SERVER/images/pxeboot/initrd.img"
+	echo -n "inst.repo=$SERVER" >>/tmp/nb-options
+	rm /tmp/nb-server
 fi
 if [ $DISTRO = "arch" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -520,16 +616,157 @@ if [ $DISTRO = "slackware" ];then
 	INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
 	echo -n "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=$KERNTYPE" >>/tmp/nb-options
 fi
+if [ $DISTRO = "alpine" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	latest-stable "Alpine Linux (latest stable)" \
+	v3.21 "Alpine Linux 3.21" \
+	v3.20 "Alpine Linux 3.20" \
+	Manual "Manually enter a version to install (e.g. v3.21)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	BASE="https://dl-cdn.alpinelinux.org/alpine/$VERSION/releases/x86_64/netboot"
+	KERNELURL="$BASE/vmlinuz-lts"
+	INITRDURL="$BASE/initramfs-lts"
+	echo -n "modloop=$BASE/modloop-lts alpine_repo=https://dl-cdn.alpinelinux.org/alpine/$VERSION/main" >>/tmp/nb-options
+fi
+if [ $DISTRO = "nixos" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	nixos-unstable "NixOS Unstable" \
+	nixos-25.11 "NixOS 25.11" \
+	nixos-25.05 "NixOS 25.05" \
+	Manual "Manually enter a version to install (e.g. nixos-25.11)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	KERNELURL="https://github.com/nix-community/nixos-images/releases/download/$VERSION/bzImage-x86_64-linux"
+	INITRDURL="https://github.com/nix-community/nixos-images/releases/download/$VERSION/initrd-x86_64-linux"
+	# The init= path is a Nix store hash that changes every build; parse it from the official iPXE script.
+	$WGET "https://github.com/nix-community/nixos-images/releases/download/$VERSION/netboot-x86_64-linux.ipxe" -O /tmp/nb-nixos.ipxe
+	NIXOS_PARAMS=$(grep '^kernel ' /tmp/nb-nixos.ipxe | tr -d '\r' | sed 's|^kernel [^ ]* ||' | sed 's|initrd=[^ ]*||g' | tr -s ' ')
+	rm -f /tmp/nb-nixos.ipxe
+	echo -n "$NIXOS_PARAMS" >>/tmp/nb-options
+fi
+if [ $DISTRO = "mint" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a version and edition:" 20 70 13 \
+	mint22-cinnamon "Linux Mint 22 Cinnamon" \
+	mint22-mate     "Linux Mint 22 MATE" \
+	mint22-xfce     "Linux Mint 22 XFCE" \
+	mint21-cinnamon "Linux Mint 21 Cinnamon" \
+	mint21-mate     "Linux Mint 21 MATE" \
+	mint21-xfce     "Linux Mint 21 XFCE" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	case "$VERSION" in
+		mint22-cinnamon) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/22-14b93ac4" ;;
+		mint22-mate)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/22-482b71dc" ;;
+		mint22-xfce)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/22-e45bc094" ;;
+		mint21-cinnamon) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-32bd7a0e" ;;
+		mint21-mate)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-f0dbd590" ;;
+		mint21-xfce)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-48716442" ;;
+	esac
+	KERNELURL="$BASE/vmlinuz"
+	INITRDURL="$BASE/initrd"
+	SQUASH="$BASE/filesystem.squashfs"
+	echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
+fi
+if [ $DISTRO = "ubuntu-live" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a distribution:" 20 70 13 \
+	popos      "Pop!_OS 22.04 (intel/amd)" \
+	elementary "elementary OS 7" \
+	zorin      "Zorin OS 17.3" \
+	kde-neon   "KDE Neon (2026-04-09)" \
+	bodhi      "Bodhi Linux 7.0.0" \
+	linux-lite "Linux Lite 6.4" \
+	backbox    "BackBox 8.1" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	case "$VERSION" in
+		popos)      BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-31dbd35b" ;;
+		elementary) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/7-82f69428" ;;
+		zorin)      BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/17.3-a87e018b" ;;
+		kde-neon)   BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/20260409-1329-88395a11" ;;
+		bodhi)      BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/7.0.0-f22738f2" ;;
+		linux-lite) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/6.4-2550834c" ;;
+		backbox)    BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/8.1-c2287989" ;;
+	esac
+	KERNELURL="$BASE/vmlinuz"
+	case "$VERSION" in
+		kde-neon) INITRDURL="$BASE/initrd.lz" ;;
+		*)        INITRDURL="$BASE/initrd" ;;
+	esac
+	SQUASH="$BASE/filesystem.squashfs"
+	case "$VERSION" in
+		popos)      echo -n "ip=dhcp boot=casper netboot=http fetch=$SQUASH" >>/tmp/nb-options ;;
+		elementary) echo -n "ip=dhcp boot=casper maybe-ubiquity netboot=url url=$SQUASH" >>/tmp/nb-options ;;
+		linux-lite) echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH username=linuxlite userfullname=linuxlite" >>/tmp/nb-options ;;
+		*)          echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options ;;
+	esac
+fi
+if [ $DISTRO = "flatcar" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a release channel:" 20 70 13 \
+	stable "Flatcar Stable (recommended)" \
+	beta   "Flatcar Beta" \
+	alpha  "Flatcar Alpha" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return
+	BASE="https://$VERSION.release.flatcar-linux.net/amd64-usr/current"
+	KERNELURL="$BASE/flatcar_production_pxe.vmlinuz"
+	INITRDURL="$BASE/flatcar_production_pxe_image.cpio.gz"
+	dialog --backtitle "$TITLE" --msgbox "Note: Flatcar downloads a complete OS image as its initrd.\nRequires at least 3 GB RAM to boot." 7 60
+	echo -n "flatcar.first_boot=1 flatcar.autologin=tty1" >>/tmp/nb-options
+fi
+if [ $DISTRO = "rescue" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
+	gparted           "GParted Live 1.8.1-3" \
+	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
+	rescuezilla       "Rescuezilla 2.6.1" \
+	grml-full         "Grml Full 2025.12" \
+	grml-small        "Grml Small 2025.12" 2>/tmp/nb-rescue || { rm -f /tmp/nb-rescue; return; }
+	DISTRO=$(cat /tmp/nb-rescue)
+	rm /tmp/nb-rescue
+	if [ $DISTRO = "gparted" ];then
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/1.8.1-3-5616e296"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/initrd"
+		SQUASH="$BASE/filesystem.squashfs"
+		echo -n "boot=live fetch=$SQUASH union=overlay username=user vga=788" >>/tmp/nb-options
+	fi
+	if [ $DISTRO = "clonezilla-deb" ];then
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.1-35-1a41a72c"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/initrd"
+		SQUASH="$BASE/filesystem.squashfs"
+		echo -n "boot=live username=user union=overlay config components noswap edd=on nomodeset ocs_live_run=ocs-live-general ocs_live_batch=no net.ifnames=0 nosplash noprompt fetch=$SQUASH" >>/tmp/nb-options
+	fi
+	if [ $DISTRO = "rescuezilla" ];then
+		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/2.6.1-123ed276"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/initrd"
+		SQUASH="$BASE/filesystem.squashfs"
+		echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
+	fi
+	if [ $DISTRO = "grml-full" ];then
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2025.12-ee78df85"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/initrd"
+		SQUASH="$BASE/filesystem.squashfs"
+		echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
+	fi
+	if [ $DISTRO = "grml-small" ];then
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2025.12-ca5dc013"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/initrd"
+		SQUASH="$BASE/filesystem.squashfs"
+		echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
+	fi
+fi
+askforopts
 #Now download the kernel and initrd.
 $WGET $KERNELURL -O /tmp/nb-linux
-$WGET $INITRDURL -O /tmp/nb-initrd
+if [ -n "${INITRDURL:-}" ]; then
+	$WGET $INITRDURL -O /tmp/nb-initrd
+fi
 }
 
 
 # Proceed with interactive menu
 while true; do
 	dialog --backtitle "$TITLE" --menu "What would you like to do?" 16 70 9 \
-	install "Install a Linux system" \
+	install "Install or boot a Linux system" \
 	wifi    "Configure wireless network" \
 	ipaddr  "View/release IP address" \
 	quit    "Quit to prompt (do not reboot)" 2>/tmp/nb-mainmenu || { rm -f /tmp/nb-mainmenu; continue; }
@@ -555,10 +792,10 @@ while true; do
 	fi
 done
 #This is what we will tell kexec.
-if [ $DISTRO != "grub4dos" ];then
-	ARGS="-l /tmp/nb-linux --initrd=/tmp/nb-initrd $OPTIONS $CUSTOM"
-else
+if [ $DISTRO = "grub4dos" ];then
 	ARGS="-l /tmp/nb-linux $OPTIONS $CUSTOM"
+else
+	ARGS="-l /tmp/nb-linux --initrd=/tmp/nb-initrd $OPTIONS $CUSTOM"
 fi
 if [ $DISTRO = "rhel-type-5" ];then
 	ARGS=$ARGS" --args-linux"

@@ -33,7 +33,8 @@ cleanup() {
     rm -rf "${WORK:-}" squashfs-root opt
     rm -f "vmlinuz64-${COREVER}" "corepure64-${COREVER}.gz" \
           "kexec-tools-${KEXEC_VER}.tar.xz" \
-          "dialog-x86_64.tcz" "ncursesw-x86_64.tcz" "openssl-x86_64.tcz"
+          "dialog-x86_64.tcz" "ncursesw-x86_64.tcz" "openssl-x86_64.tcz" \
+          "firmware-rtl_nic-x86_64.tcz"
     for _pkg in ${WIFI_PKGS_ALL:-}; do
         rm -f "${_pkg}-x86_64.tcz"
     done
@@ -43,7 +44,7 @@ trap cleanup EXIT
 NBCDVER=17.0
 COREVER=17.0
 KEXEC_VER=2.0.29
-TCX64="http://tinycorelinux.net/${COREVER%.*}.x/x86_64"
+TCX64="http://distro.ibiblio.org/tinycorelinux/${COREVER%.*}.x/x86_64"
 
 # --- Locate GRUB EFI modules directory ---
 GRUB_MODULES_DIR=""
@@ -76,7 +77,7 @@ if [ ! -f "corepure64-${COREVER}.gz" ]; then
 fi
 
 # x86_64 TCZ packages (downloaded once, cached locally)
-for pkg in dialog ncursesw openssl firmware-lan; do
+for pkg in dialog ncursesw openssl firmware-lan firmware-rtl_nic; do
     if [ ! -f "${pkg}-x86_64.tcz" ]; then
         wget "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"
     fi
@@ -246,7 +247,7 @@ cp -v nbscript.sh "${NBINIT}/usr/bin"
 
 # x86_64 TCZ packages
 if [ -e squashfs-root ]; then rm -r squashfs-root; fi
-for pkg in dialog ncursesw openssl firmware-lan; do
+for pkg in dialog ncursesw openssl firmware-lan firmware-rtl_nic; do
     unsquashfs "${pkg}-x86_64.tcz"
     cp -a squashfs-root/* "${NBINIT}"
     rm -r squashfs-root
@@ -481,4 +482,4 @@ chown -R 1000:1000 "${DONE}"
 echo ""
 echo "Build complete!"
 echo "  Base ISO:     ${DONE}/NetbootCD-Neo-$NBCDVER.iso"
-echo "  Wireless ISO: ${DONE}/NetbootCD-Neo-$NBCDVER-wifi.iso"
+echo "  Wifi-enabled ISO: ${DONE}/NetbootCD-Neo-$NBCDVER-wifi.iso"
