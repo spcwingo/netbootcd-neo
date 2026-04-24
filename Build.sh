@@ -43,7 +43,7 @@ trap cleanup EXIT
 
 NBCDVER=17.0
 COREVER=17.0
-KEXEC_VER=2.0.29
+KEXEC_VER=2.0.32
 TCX64="http://distro.ibiblio.org/tinycorelinux/${COREVER%.*}.x/x86_64"
 
 # --- Locate GRUB EFI modules directory ---
@@ -263,7 +263,7 @@ mkdir -p "${KEXEC_BUILD}"
 tar -C "${KEXEC_BUILD}" --strip-components=1 -xf "kexec-tools-${KEXEC_VER}.tar.xz"
 (
     cd "${KEXEC_BUILD}"
-    LDFLAGS='-static' ./configure --sbindir=/sbin > /dev/null
+    LDFLAGS='-static' ./configure --sbindir=/sbin --with-lzma --with-zlib
     make -j"$(nproc)"
 )
 KEXEC_BIN="${KEXEC_BUILD}/build/sbin/kexec"

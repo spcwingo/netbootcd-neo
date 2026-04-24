@@ -67,7 +67,7 @@ wifimenu ()
 {
 	if ! command -v wpa_supplicant >/dev/null 2>&1; then
 		dialog --backtitle "$TITLE" --msgbox \
-			"WiFi tools not found.\nPlease use the WiFi-enabled ISO (NetbootCD-Neo-*-wifi.iso)." 8 57
+			"WiFi tools not found.\nPlease use the WiFi-enabled ISO (NetbootCD-Neo-*-wifi.iso)." 8 57 || true
 		return
 	fi
 
@@ -82,7 +82,7 @@ wifimenu ()
 
 	if [ -z "$WIFI_IFACE" ]; then
 		dialog --backtitle "$TITLE" --msgbox \
-			"No wireless interface found.\nCheck that your hardware is supported and firmware is loaded." 8 57
+			"No wireless interface found.\nCheck that your hardware is supported and firmware is loaded." 8 57 || true
 		return
 	fi
 
@@ -92,7 +92,7 @@ wifimenu ()
 	SSID_COUNT=0
 	if command -v iw >/dev/null 2>&1; then
 		dialog --backtitle "$TITLE" --infobox \
-			"Scanning for wireless networks on $WIFI_IFACE...\nThis may take a few seconds." 5 57
+			"Scanning for wireless networks on $WIFI_IFACE...\nThis may take a few seconds." 5 57 || true
 		sleep 2
 		iw dev "$WIFI_IFACE" scan 2>/dev/null > /tmp/nb-wifiscan || true
 		# Retry once if the first scan returned nothing (card may still be initializing)
@@ -144,8 +144,9 @@ wifimenu ()
 	if [ -z "$SSID" ]; then return; fi
 
 	# Get password (blank = open network)
-	printf 'Password for "%s" (leave blank for open network): ' "$SSID"
-	read WIFI_PASS
+	dialog --backtitle "$TITLE" --inputbox "Password for \"$SSID\":\n(Leave blank for an open network)" 8 60 2>/tmp/nb-wifipass || { rm -f /tmp/nb-wifipass; return; }
+	WIFI_PASS=$(cat /tmp/nb-wifipass)
+	rm -f /tmp/nb-wifipass
 
 	killall wpa_supplicant 2>/dev/null || true
 	sleep 1
@@ -156,7 +157,7 @@ wifimenu ()
 		printf 'network={\n\tssid="%s"\n\tkey_mgmt=NONE\n}\n' "$SSID" > /tmp/nb-wpa.conf
 	fi
 
-	dialog --backtitle "$TITLE" --infobox "Connecting to \"$SSID\"..." 4 45
+	dialog --backtitle "$TITLE" --infobox "Connecting to \"$SSID\"..." 4 45 || true
 	wpa_supplicant -B -i "$WIFI_IFACE" -c /tmp/nb-wpa.conf -D nl80211,wext \
 		>/tmp/nb-wpa.log 2>&1 || true
 	sleep 4
@@ -172,12 +173,12 @@ wifimenu ()
 
 	if [ "$CONNECTED" -eq 0 ]; then
 		dialog --backtitle "$TITLE" --msgbox \
-			"Could not associate with \"$SSID\".\nCheck the password and try again." 8 57
+			"Could not associate with \"$SSID\".\nCheck the password and try again." 8 57 || true
 		return
 	fi
 
 	# Request IP via DHCP
-	dialog --backtitle "$TITLE" --infobox "Requesting IP address via DHCP..." 4 45
+	dialog --backtitle "$TITLE" --infobox "Requesting IP address via DHCP..." 4 45 || true
 	killall udhcpc 2>/dev/null || true
 	udhcpc -i "$WIFI_IFACE" -q >/dev/null 2>&1 || true
 	sleep 2
@@ -189,11 +190,11 @@ wifimenu ()
 		WIFIINFO=$(ifconfig "$WIFI_IFACE" 2>/dev/null | head -4)
 		dialog --backtitle "$TITLE" --msgbox \
 			"Connected to \"$SSID\" with internet access!\n\n${WIFIINFO}\n\nYou can now install or boot a Linux system." \
-			15 62
+			15 62 || true
 	else
 		dialog --backtitle "$TITLE" --msgbox \
 			"Associated with \"$SSID\" but internet is not reachable.\nCheck network settings and try again." \
-			9 57
+			9 57 || true
 	fi
 }
 
@@ -258,14 +259,14 @@ ipadrmenu ()
 installmenu ()
 {
 dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 17 \
-ubuntu "Ubuntu [d-i]" \
+ubuntu "Ubuntu" \
 debian "Debian GNU/Linux" \
 debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
 kali "Kali Linux" \
 lmde "Linux Mint Debian Edition" \
 sparky "Sparky Linux" \
-debian-live "Debian 13 Live" \
+q4os "Q4OS Trinity 6.6" \
 fedora "Fedora" \
 opensuse "openSUSE" \
 mageia "Mageia" \
@@ -279,29 +280,24 @@ arch "Arch Linux" \
 alpine "Alpine Linux" \
 nixos "NixOS" \
 slackware "Slackware" \
-mint "Linux Mint" \
-ubuntu-live "Ubuntu-based live distros" \
+bodhi "Bodhi Linux 7.0.0" \
 flatcar "Flatcar Container Linux" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
 if [ $DISTRO = "ubuntu" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	resolute "Ubuntu 26.04 LTS (Subiquity)" \
 	noble "Ubuntu 24.04 LTS (Subiquity)" \
 	jammy "Ubuntu 22.04 LTS" \
 	focal "Ubuntu 20.04 LTS" \
 	bionic "Ubuntu 18.04 LTS" \
 	xenial "Ubuntu 16.04 LTS" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
-	if [ "$VERSION" = "noble" ] || [ "$VERSION" = "resolute" ]; then
-		KERNELURL="https://releases.ubuntu.com/$VERSION/netboot/amd64/linux"
-		INITRDURL="https://releases.ubuntu.com/$VERSION/netboot/amd64/initrd"
-		case "$VERSION" in
-			noble)    ISODEFAULT="https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso" ;;
-			resolute) ISODEFAULT="https://releases.ubuntu.com/26.04/ubuntu-26.04-live-server-amd64.iso" ;;
-		esac
+	getversion || return 0
+	if [ "$VERSION" = "noble" ]; then
+		KERNELURL="https://releases.ubuntu.com/noble/netboot/amd64/linux"
+		INITRDURL="https://releases.ubuntu.com/noble/netboot/amd64/initrd"
+		ISODEFAULT="https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso"
 		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu live-server ISO:" 8 70 "$ISODEFAULT" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
 		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl)" >>/tmp/nb-options
 		rm /tmp/nb-isourl
@@ -337,7 +333,7 @@ if [ $DISTRO = "debian" ];then
 	stable "Debian stable" \
 	testing "Debian testing" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -347,7 +343,7 @@ if [ $DISTRO = "debiandaily" ];then
 	high "Default" \
 	medium "Show installation menu" \
 	low "Expert mode" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="http://d-i.debian.org/daily-images/amd64/daily/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://d-i.debian.org/daily-images/amd64/daily/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -360,7 +356,7 @@ if [ $DISTRO = "devuan" ];then
 	chimaera "Devuan chimaera" \
 	ceres "Devuan ceres" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -368,7 +364,7 @@ fi
 if [ $DISTRO = "kali" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	kali-rolling "Kali Linux Rolling" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="https://http.kali.org/kali/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="https://http.kali.org/kali/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
@@ -376,7 +372,7 @@ fi
 if [ $DISTRO = "lmde" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to boot:" 20 70 13 \
 	6 "LMDE 6 Cinnamon" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6-dc29210f"
 	KERNELURL="$BASE/vmlinuz"
 	INITRDURL="$BASE/initrd"
@@ -387,7 +383,7 @@ if [ $DISTRO = "sparky" ];then
 	rolling-xfce "Sparky Rolling XFCE (Mar 2026)" \
 	rolling-lxqt "Sparky Rolling LXQt (Mar 2026)" \
 	stable "Sparky Stable 8.2 XFCE" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	case "$VERSION" in
 		rolling-xfce) BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.03-314f0a50" ;;
 		rolling-lxqt) BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.03-1a7f6c6a" ;;
@@ -397,30 +393,11 @@ if [ $DISTRO = "sparky" ];then
 	INITRDURL="$BASE/initrd"
 	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
 fi
-if [ $DISTRO = "debian-live" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a desktop environment:" 20 70 13 \
-	xfce     "Debian 13 Live - XFCE" \
-	kde      "Debian 13 Live - KDE" \
-	gnome    "Debian 13 Live - GNOME" \
-	cinnamon "Debian 13 Live - Cinnamon" \
-	mate     "Debian 13 Live - MATE" \
-	lxde     "Debian 13 Live - LXDE" \
-	lxqt     "Debian 13 Live - LXQt" \
-	core     "Debian 13 Live - Standard (no desktop)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
-	KERNELURL="https://github.com/netbootxyz/debian-core-13/releases/download/13.4.0-0a426450/vmlinuz"
-	INITRDURL="https://github.com/netbootxyz/debian-core-13/releases/download/13.4.0-0a426450/initrd"
-	case "$VERSION" in
-		xfce)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-5048a26b/filesystem.squashfs" ;;
-		kde)      SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-c5f83616/filesystem.squashfs" ;;
-		gnome)    SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-0aea8fe2/filesystem.squashfs" ;;
-		cinnamon) SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-f213be8c/filesystem.squashfs" ;;
-		mate)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-8a7bb188/filesystem.squashfs" ;;
-		lxde)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-79e9a15b/filesystem.squashfs" ;;
-		lxqt)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.2.0-6088759b/filesystem.squashfs" ;;
-		core)     SQUASH="https://github.com/netbootxyz/debian-squash/releases/download/13.4.0-9d9b777e/filesystem.squashfs" ;;
-	esac
-	echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
+if [ $DISTRO = "q4os" ];then
+	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6.6-5d30850e"
+	KERNELURL="$BASE/vmlinuz"
+	INITRDURL="$BASE/initrd"
+	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
 fi
 if [ $DISTRO = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -429,7 +406,7 @@ if [ $DISTRO = "fedora" ];then
 	releases/41/Server "Fedora 41" \
 	development/rawhide "Rawhide" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	KERNELURL="$(cat /tmp/nb-server)/images/pxeboot/vmlinuz"
 	INITRDURL="$(cat /tmp/nb-server)/images/pxeboot/initrd.img"
@@ -446,7 +423,7 @@ if [ $DISTRO = "opensuse" ];then
 	leap/15.4 "openSUSE Leap 15.4" \
 	leap/15.3 "openSUSE Leap 15.3" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	if [ $VERSION != "tumbleweed" ] && [ $VERSION != "slowroll" ];then
 		VERSION=distribution/$VERSION
 	fi
@@ -463,7 +440,7 @@ if [ $DISTRO = "mageia" ];then
 	8 "Mageia 8" \
 	cauldron "Mageia cauldron" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/vmlinuz"
 	INITRDURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/all.rdz"
 	echo -n 'automatic=method:http' >>/tmp/nb-options
@@ -474,7 +451,7 @@ if [ $DISTRO = "rhel-type-10" ];then
 	c_10-stream "Latest version of CentOS Stream 10" \
 	r_10 "Latest version of Rocky Linux 10" \
 	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
 	if [ $TYPE = a ];then
@@ -498,7 +475,7 @@ if [ $DISTRO = "rhel-type-9" ];then
 	c_9-stream "Latest version of CentOS Stream 9" \
 	r_9 "Latest version of Rocky Linux 9" \
 	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
 	if [ $TYPE = a ];then
@@ -522,7 +499,7 @@ if [ $DISTRO = "rhel-type-8" ];then
 	c_8 "Latest version of CentOS 8" \
 	r_8 "Latest version of Rocky Linux 8" \
 	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
 	if [ $TYPE = a ];then
@@ -545,7 +522,7 @@ if [ $DISTRO = "rhel-type-7" ];then
 	c_7 "Latest version of CentOS 7" \
 	s_7x "Latest version of Scientific Linux 7" \
 	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
 	if [ $TYPE = s ];then
@@ -564,7 +541,7 @@ if [ $DISTRO = "rhel-type-6" ];then
 	c_6 "Latest version of CentOS 6" \
 	s_6x "Latest version of Scientific Linux 6" \
 	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
 	if [ $TYPE = s ];then
@@ -585,7 +562,7 @@ if [ $DISTRO = "openeuler" ];then
 	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
 	25.03 "openEuler 25.03" \
 	Manual "Manually enter a version to install (e.g. 24.03-LTS)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	dialog --inputbox "Where do you want to install openEuler from?" 8 70 "https://repo.openeuler.org/openEuler-$VERSION/everything/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
@@ -596,7 +573,7 @@ fi
 if [ $DISTRO = "arch" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	latest "Arch x86_64" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/vmlinuz-linux"
 	INITRDURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/initramfs-linux.img"
 	echo -n 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
@@ -606,7 +583,7 @@ if [ $DISTRO = "slackware" ];then
 	slackware64-15.0 "Slackware 15.0" \
 	slackware64-14.2 "Slackware 14.2" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	dialog --backtitle "$TITLE" --menu "Choose a kernel type:" 20 70 13 \
 	huge.s "" \
 	hugesmp.s "" 2>/tmp/nb-kerntype || { rm -f /tmp/nb-kerntype; return; }
@@ -622,7 +599,7 @@ if [ $DISTRO = "alpine" ];then
 	v3.21 "Alpine Linux 3.21" \
 	v3.20 "Alpine Linux 3.20" \
 	Manual "Manually enter a version to install (e.g. v3.21)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	BASE="https://dl-cdn.alpinelinux.org/alpine/$VERSION/releases/x86_64/netboot"
 	KERNELURL="$BASE/vmlinuz-lts"
 	INITRDURL="$BASE/initramfs-lts"
@@ -634,7 +611,7 @@ if [ $DISTRO = "nixos" ];then
 	nixos-25.11 "NixOS 25.11" \
 	nixos-25.05 "NixOS 25.05" \
 	Manual "Manually enter a version to install (e.g. nixos-25.11)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	KERNELURL="https://github.com/nix-community/nixos-images/releases/download/$VERSION/bzImage-x86_64-linux"
 	INITRDURL="https://github.com/nix-community/nixos-images/releases/download/$VERSION/initrd-x86_64-linux"
 	# The init= path is a Nix store hash that changes every build; parse it from the official iPXE script.
@@ -643,77 +620,32 @@ if [ $DISTRO = "nixos" ];then
 	rm -f /tmp/nb-nixos.ipxe
 	echo -n "$NIXOS_PARAMS" >>/tmp/nb-options
 fi
-if [ $DISTRO = "mint" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a version and edition:" 20 70 13 \
-	mint22-cinnamon "Linux Mint 22 Cinnamon" \
-	mint22-mate     "Linux Mint 22 MATE" \
-	mint22-xfce     "Linux Mint 22 XFCE" \
-	mint21-cinnamon "Linux Mint 21 Cinnamon" \
-	mint21-mate     "Linux Mint 21 MATE" \
-	mint21-xfce     "Linux Mint 21 XFCE" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
-	case "$VERSION" in
-		mint22-cinnamon) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/22-14b93ac4" ;;
-		mint22-mate)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/22-482b71dc" ;;
-		mint22-xfce)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/22-e45bc094" ;;
-		mint21-cinnamon) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-32bd7a0e" ;;
-		mint21-mate)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-f0dbd590" ;;
-		mint21-xfce)     BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-48716442" ;;
-	esac
+if [ $DISTRO = "bodhi" ];then
+	BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/7.0.0-f22738f2"
 	KERNELURL="$BASE/vmlinuz"
 	INITRDURL="$BASE/initrd"
 	SQUASH="$BASE/filesystem.squashfs"
 	echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
-fi
-if [ $DISTRO = "ubuntu-live" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a distribution:" 20 70 13 \
-	popos      "Pop!_OS 22.04 (intel/amd)" \
-	elementary "elementary OS 7" \
-	zorin      "Zorin OS 17.3" \
-	kde-neon   "KDE Neon (2026-04-09)" \
-	bodhi      "Bodhi Linux 7.0.0" \
-	linux-lite "Linux Lite 6.4" \
-	backbox    "BackBox 8.1" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
-	case "$VERSION" in
-		popos)      BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/21-31dbd35b" ;;
-		elementary) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/7-82f69428" ;;
-		zorin)      BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/17.3-a87e018b" ;;
-		kde-neon)   BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/20260409-1329-88395a11" ;;
-		bodhi)      BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/7.0.0-f22738f2" ;;
-		linux-lite) BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/6.4-2550834c" ;;
-		backbox)    BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/8.1-c2287989" ;;
-	esac
-	KERNELURL="$BASE/vmlinuz"
-	case "$VERSION" in
-		kde-neon) INITRDURL="$BASE/initrd.lz" ;;
-		*)        INITRDURL="$BASE/initrd" ;;
-	esac
-	SQUASH="$BASE/filesystem.squashfs"
-	case "$VERSION" in
-		popos)      echo -n "ip=dhcp boot=casper netboot=http fetch=$SQUASH" >>/tmp/nb-options ;;
-		elementary) echo -n "ip=dhcp boot=casper maybe-ubiquity netboot=url url=$SQUASH" >>/tmp/nb-options ;;
-		linux-lite) echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH username=linuxlite userfullname=linuxlite" >>/tmp/nb-options ;;
-		*)          echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options ;;
-	esac
 fi
 if [ $DISTRO = "flatcar" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a release channel:" 20 70 13 \
 	stable "Flatcar Stable (recommended)" \
 	beta   "Flatcar Beta" \
 	alpha  "Flatcar Alpha" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return
+	getversion || return 0
 	BASE="https://$VERSION.release.flatcar-linux.net/amd64-usr/current"
 	KERNELURL="$BASE/flatcar_production_pxe.vmlinuz"
 	INITRDURL="$BASE/flatcar_production_pxe_image.cpio.gz"
-	dialog --backtitle "$TITLE" --msgbox "Note: Flatcar downloads a complete OS image as its initrd.\nRequires at least 3 GB RAM to boot." 7 60
+	dialog --backtitle "$TITLE" --msgbox "Note: Flatcar downloads a complete OS image as its initrd.\nRequires at least 3 GB RAM to boot." 7 60 || true
 	echo -n "flatcar.first_boot=1 flatcar.autologin=tty1" >>/tmp/nb-options
 fi
+
 if [ $DISTRO = "rescue" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
 	gparted           "GParted Live 1.8.1-3" \
 	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
 	rescuezilla       "Rescuezilla 2.6.1" \
+	4mlinux           "4MLinux 51.0" \
 	grml-full         "Grml Full 2025.12" \
 	grml-small        "Grml Small 2025.12" 2>/tmp/nb-rescue || { rm -f /tmp/nb-rescue; return; }
 	DISTRO=$(cat /tmp/nb-rescue)
@@ -738,6 +670,11 @@ if [ $DISTRO = "rescue" ];then
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
+	fi
+	if [ $DISTRO = "4mlinux" ];then
+		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/51.0-fcaac630"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/initrd"
 	fi
 	if [ $DISTRO = "grml-full" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2025.12-ee78df85"
@@ -778,12 +715,13 @@ while true; do
 	if [ "$MAINMENU" = "install" ]; then
 		true>/tmp/nb-options
 		true>/tmp/nb-custom
-		installmenu
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		installmenu || true
 		if [ -f /tmp/nb-linux ]; then break; fi
 		continue
 	fi
 	if [ "$MAINMENU" = "wifi" ]; then
-		wifimenu
+		wifimenu || true
 		exec "$0" "$@"
 	fi
 	if [ "$MAINMENU" = "ipaddr" ]; then
@@ -792,11 +730,12 @@ while true; do
 	fi
 done
 #This is what we will tell kexec.
-if [ $DISTRO = "grub4dos" ];then
-	ARGS="-l /tmp/nb-linux $OPTIONS $CUSTOM"
-else
+if [ -f /tmp/nb-initrd ]; then
 	ARGS="-l /tmp/nb-linux --initrd=/tmp/nb-initrd $OPTIONS $CUSTOM"
+else
+	ARGS="-l /tmp/nb-linux $OPTIONS $CUSTOM"
 fi
+
 if [ $DISTRO = "rhel-type-5" ];then
 	ARGS=$ARGS" --args-linux"
 fi
