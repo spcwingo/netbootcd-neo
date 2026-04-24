@@ -265,6 +265,7 @@ debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
 kali "Kali Linux" \
 lmde "Linux Mint Debian Edition" \
+pardus "Pardus" \
 sparky "Sparky Linux" \
 q4os "Q4OS Trinity 6.6" \
 fedora "Fedora" \
@@ -275,6 +276,7 @@ rhel-type-9 "AlmaLinux 9 / CentOS 9-Stream / Rocky Linux 9" \
 rhel-type-8 "AlmaLinux 8 / CentOS 8 / Rocky Linux 8" \
 rhel-type-7 "CentOS 7 and Scientific Linux 7" \
 rhel-type-6 "CentOS 6 and Scientific Linux 6" \
+cloudlinux "CloudLinux 8 / CloudLinux 9" \
 openeuler "openEuler" \
 arch "Arch Linux" \
 alpine "Alpine Linux" \
@@ -378,6 +380,16 @@ if [ $DISTRO = "lmde" ];then
 	INITRDURL="$BASE/initrd"
 	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
 fi
+if [ $DISTRO = "pardus" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	yirmibes "Pardus 25" \
+	yirmiuc  "Pardus 23" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return 0
+	BASE="https://depo.pardus.org.tr/pardus/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64"
+	KERNELURL="$BASE/linux"
+	INITRDURL="$BASE/initrd.gz"
+	echo -n 'vga=normal quiet '>>/tmp/nb-options
+fi
 if [ $DISTRO = "sparky" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to boot:" 20 70 13 \
 	rolling-xfce "Sparky Rolling XFCE (Mar 2026)" \
@@ -401,13 +413,13 @@ if [ $DISTRO = "q4os" ];then
 fi
 if [ $DISTRO = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
- releases/43/Server "Fedora 43" \
-	releases/42/Server "Fedora 42" \
-	releases/41/Server "Fedora 41" \
+ 	releases/43 "Fedora 43" \
+	releases/42 "Fedora 42" \
+	releases/41 "Fedora 41" \
 	development/rawhide "Rawhide" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/Server/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	KERNELURL="$(cat /tmp/nb-server)/images/pxeboot/vmlinuz"
 	INITRDURL="$(cat /tmp/nb-server)/images/pxeboot/initrd.img"
 	echo -n "inst.stage2=$(cat /tmp/nb-server)" >>/tmp/nb-options
@@ -553,6 +565,18 @@ if [ $DISTRO = "rhel-type-6" ];then
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
 	echo -n "ide=nodma method=$SERVER" >>/tmp/nb-options
+	rm /tmp/nb-server
+fi
+if [ $DISTRO = "cloudlinux" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	9 "CloudLinux 9" \
+	8 "CloudLinux 8" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	getversion || return 0
+	dialog --backtitle "$TITLE" --inputbox "Where do you want to install CloudLinux from?" 8 70 "https://download.cloudlinux.com/cloudlinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	SERVER=$(cat /tmp/nb-server)
+	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
+	INITRDURL="$SERVER/images/pxeboot/initrd.img"
+	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ $DISTRO = "openeuler" ];then
