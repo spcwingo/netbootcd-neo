@@ -28,7 +28,7 @@ PATH=/usr/local/sbin:/usr/local/bin:$PATH
 export PATH
 export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-TITLE="NetbootCD-Neo Script 17.0 - April 17, 2026"
+TITLE="NetbootCD-Neo Script 17.1 - April 24, 2026"
 
 # Detect UEFI mode once at startup; used throughout the script.
 EFIMODE=0
@@ -263,10 +263,6 @@ ubuntu "Ubuntu" \
 debian "Debian GNU/Linux" \
 debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
-kali "Kali Linux" \
-lmde "Linux Mint Debian Edition" \
-pardus "Pardus" \
-sparky "Sparky Linux" \
 q4os "Q4OS Trinity 6.6" \
 fedora "Fedora" \
 opensuse "openSUSE" \
@@ -279,11 +275,7 @@ rhel-type-6 "CentOS 6 and Scientific Linux 6" \
 cloudlinux "CloudLinux 8 / CloudLinux 9" \
 openeuler "openEuler" \
 arch "Arch Linux" \
-alpine "Alpine Linux" \
-nixos "NixOS" \
 slackware "Slackware" \
-bodhi "Bodhi Linux 7.0.0" \
-flatcar "Flatcar Container Linux" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
@@ -363,48 +355,7 @@ if [ $DISTRO = "devuan" ];then
 	INITRDURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
 fi
-if [ $DISTRO = "kali" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	kali-rolling "Kali Linux Rolling" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	KERNELURL="https://http.kali.org/kali/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
-	INITRDURL="https://http.kali.org/kali/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
-	echo -n 'vga=normal quiet '>>/tmp/nb-options
-fi
-if [ $DISTRO = "lmde" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to boot:" 20 70 13 \
-	6 "LMDE 6 Cinnamon" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6-dc29210f"
-	KERNELURL="$BASE/vmlinuz"
-	INITRDURL="$BASE/initrd"
-	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
-fi
-if [ $DISTRO = "pardus" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	yirmibes "Pardus 25" \
-	yirmiuc  "Pardus 23" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	BASE="https://depo.pardus.org.tr/pardus/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64"
-	KERNELURL="$BASE/linux"
-	INITRDURL="$BASE/initrd.gz"
-	echo -n 'vga=normal quiet '>>/tmp/nb-options
-fi
-if [ $DISTRO = "sparky" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to boot:" 20 70 13 \
-	rolling-xfce "Sparky Rolling XFCE (Mar 2026)" \
-	rolling-lxqt "Sparky Rolling LXQt (Mar 2026)" \
-	stable "Sparky Stable 8.2 XFCE" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	case "$VERSION" in
-		rolling-xfce) BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.03-314f0a50" ;;
-		rolling-lxqt) BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.03-1a7f6c6a" ;;
-		stable)       BASE="https://github.com/netbootxyz/debian-squash/releases/download/8.2-28fbf253" ;;
-	esac
-	KERNELURL="$BASE/vmlinuz"
-	INITRDURL="$BASE/initrd"
-	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
-fi
+
 if [ $DISTRO = "q4os" ];then
 	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6.6-5d30850e"
 	KERNELURL="$BASE/vmlinuz"
@@ -413,13 +364,13 @@ if [ $DISTRO = "q4os" ];then
 fi
 if [ $DISTRO = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
- 	releases/43 "Fedora 43" \
-	releases/42 "Fedora 42" \
-	releases/41 "Fedora 41" \
+ 	development/44/Server "Fedora 44" \
+	releases/43/Server "Fedora 43" \
+	releases/42/Server "Fedora 42" \
 	development/rawhide "Rawhide" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/Server/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	KERNELURL="$(cat /tmp/nb-server)/images/pxeboot/vmlinuz"
 	INITRDURL="$(cat /tmp/nb-server)/images/pxeboot/initrd.img"
 	echo -n "inst.stage2=$(cat /tmp/nb-server)" >>/tmp/nb-options
@@ -429,11 +380,7 @@ if [ $DISTRO = "opensuse" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	tumbleweed "openSUSE Tumbleweed" \
 	slowroll "openSUSE Slowroll" \
-	leap/16.0 "openSUSE Leap 16.0" \
 	leap/15.6 "openSUSE Leap 15.6" \
-	leap/15.5 "openSUSE Leap 15.5" \
-	leap/15.4 "openSUSE Leap 15.4" \
-	leap/15.3 "openSUSE Leap 15.3" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	if [ $VERSION != "tumbleweed" ] && [ $VERSION != "slowroll" ];then
@@ -448,8 +395,8 @@ if [ $DISTRO = "opensuse" ];then
 fi
 if [ $DISTRO = "mageia" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	10 "Mageia 10" \
 	9 "Mageia 9" \
-	8 "Mageia 8" \
 	cauldron "Mageia cauldron" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
@@ -616,52 +563,6 @@ if [ $DISTRO = "slackware" ];then
 	KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/$KERNTYPE/bzImage"
 	INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
 	echo -n "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=$KERNTYPE" >>/tmp/nb-options
-fi
-if [ $DISTRO = "alpine" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	latest-stable "Alpine Linux (latest stable)" \
-	v3.21 "Alpine Linux 3.21" \
-	v3.20 "Alpine Linux 3.20" \
-	Manual "Manually enter a version to install (e.g. v3.21)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	BASE="https://dl-cdn.alpinelinux.org/alpine/$VERSION/releases/x86_64/netboot"
-	KERNELURL="$BASE/vmlinuz-lts"
-	INITRDURL="$BASE/initramfs-lts"
-	echo -n "modloop=$BASE/modloop-lts alpine_repo=https://dl-cdn.alpinelinux.org/alpine/$VERSION/main" >>/tmp/nb-options
-fi
-if [ $DISTRO = "nixos" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	nixos-unstable "NixOS Unstable" \
-	nixos-25.11 "NixOS 25.11" \
-	nixos-25.05 "NixOS 25.05" \
-	Manual "Manually enter a version to install (e.g. nixos-25.11)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	KERNELURL="https://github.com/nix-community/nixos-images/releases/download/$VERSION/bzImage-x86_64-linux"
-	INITRDURL="https://github.com/nix-community/nixos-images/releases/download/$VERSION/initrd-x86_64-linux"
-	# The init= path is a Nix store hash that changes every build; parse it from the official iPXE script.
-	$WGET "https://github.com/nix-community/nixos-images/releases/download/$VERSION/netboot-x86_64-linux.ipxe" -O /tmp/nb-nixos.ipxe
-	NIXOS_PARAMS=$(grep '^kernel ' /tmp/nb-nixos.ipxe | tr -d '\r' | sed 's|^kernel [^ ]* ||' | sed 's|initrd=[^ ]*||g' | tr -s ' ')
-	rm -f /tmp/nb-nixos.ipxe
-	echo -n "$NIXOS_PARAMS" >>/tmp/nb-options
-fi
-if [ $DISTRO = "bodhi" ];then
-	BASE="https://github.com/netbootxyz/ubuntu-squash/releases/download/7.0.0-f22738f2"
-	KERNELURL="$BASE/vmlinuz"
-	INITRDURL="$BASE/initrd"
-	SQUASH="$BASE/filesystem.squashfs"
-	echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
-fi
-if [ $DISTRO = "flatcar" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a release channel:" 20 70 13 \
-	stable "Flatcar Stable (recommended)" \
-	beta   "Flatcar Beta" \
-	alpha  "Flatcar Alpha" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	BASE="https://$VERSION.release.flatcar-linux.net/amd64-usr/current"
-	KERNELURL="$BASE/flatcar_production_pxe.vmlinuz"
-	INITRDURL="$BASE/flatcar_production_pxe_image.cpio.gz"
-	dialog --backtitle "$TITLE" --msgbox "Note: Flatcar downloads a complete OS image as its initrd.\nRequires at least 3 GB RAM to boot." 7 60 || true
-	echo -n "flatcar.first_boot=1 flatcar.autologin=tty1" >>/tmp/nb-options
 fi
 
 if [ $DISTRO = "rescue" ];then
