@@ -34,7 +34,7 @@ cleanup() {
     rm -f "vmlinuz64-${COREVER}" "corepure64-${COREVER}.gz" \
           "kexec-tools-${KEXEC_VER}.tar.xz" \
           "dialog-x86_64.tcz" "ncursesw-x86_64.tcz" "openssl-x86_64.tcz" \
-          "firmware-rtl_nic-x86_64.tcz"
+          "firmware-rtl_nic-x86_64.tcz" "firmware-cavium_nic-x86_64.tcz"
     for _pkg in ${WIFI_PKGS_ALL:-}; do
         rm -f "${_pkg}-x86_64.tcz"
     done
@@ -77,7 +77,8 @@ if [ ! -f "corepure64-${COREVER}.gz" ]; then
 fi
 
 # x86_64 TCZ packages (downloaded once, cached locally)
-for pkg in dialog ncursesw openssl firmware-lan firmware-rtl_nic; do
+for pkg in dialog ncursesw openssl firmware-lan firmware-rtl_nic \
+firmware-cavium_nic firmware-lan firmware-broadcom_bnx2 firmware-broadcom_bnx2x; do
     if [ ! -f "${pkg}-x86_64.tcz" ]; then
         wget "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"
     fi
@@ -98,7 +99,6 @@ echo "Detected kernel version: $KVER"
 WIFI_PKGS="wifi wpa_supplicant-dbus iw wireless-${KVER} wireless-regdb wireless_tools \
     firmware-atheros \
     firmware-broadcom_bcm43xx firmware-broadcom_bnx2 firmware-broadcom_bnx2x \
-    firmware-cavium_nic firmware-chelsio \
     firmware-ipw2100 firmware-ipw2200 firmware-iwimax \
     firmware-iwl8000 firmware-iwl9000 firmware-iwlax20x firmware-iwlwifi \
     firmware-lan firmware-marvel firmware-mediatek firmware-mellanox \
@@ -106,7 +106,8 @@ WIFI_PKGS="wifi wpa_supplicant-dbus iw wireless-${KVER} wireless-regdb wireless_
     firmware-openfwwf firmware-qca firmware-qed \
     firmware-ralinkwifi firmware-rtl_nic firmware-rtlwifi \
     firmware-ti-connectivity firmware-tigon \
-    firmware-vxge firmware-wlan firmware-zd1211"
+    firmware-vxge firmware-wlan firmware-zd1211 \
+    firmware-rtl_nic-x86_64.tcz firmware-cavium_nic-x86_64.tcz"
 # Download a TCZ package plus all of its transitive dependencies by reading
 # the .tcz.dep file that TinyCore publishes alongside each package.
 # Discovered names accumulate in WIFI_PKGS_ALL for extraction and cleanup.
@@ -321,6 +322,20 @@ done
 
 cp "${DONE}/vmlinuz" "${DONE}/nbinit4.gz" "${WORK}/iso/boot/"
 
+# Fetch netboot.xyz binaries.  netboot.xyz.lkrn is loaded by isolinux in
+# BIOS mode; netboot.xyz.efi is chainloaded by GRUB in UEFI mode.  Both
+# drop into the live iPXE menu fetched from boot.netboot.xyz at runtime.
+echo "Downloading netboot.xyz binaries..."
+wget -q --show-progress https://boot.netboot.xyz/ipxe/netboot.xyz.lkrn \
+    -O "${WORK}/iso/boot/netboot.xyz.lkrn"
+# Use the -snp build for UEFI: it prefers the firmware's Simple Network
+# Protocol (avoiding the "iPXE initialising devices..." hang seen with
+# the full-driver netboot.xyz.efi) but retains fallback driver code, so
+# its PE/COFF layout is compatible with GRUB's chainloader.  The smaller
+# -snponly build trips GRUB chainloader.c with "unknown error".
+wget -q --show-progress https://boot.netboot.xyz/ipxe/netboot.xyz-snp.efi \
+    -O "${WORK}/iso/boot/netboot.xyz.efi"
+
 # BIOS boot menu
 cat > "${WORK}/iso/boot/isolinux/isolinux.cfg" << EOF
 DEFAULT menu.c32
@@ -338,6 +353,10 @@ menu default
 kernel /boot/vmlinuz
 initrd /boot/nbinit4.gz
 append quiet
+
+LABEL netbootxyz
+menu label Boot ^netboot.xyz
+kernel /boot/netboot.xyz.lkrn
 
 EOF
 
@@ -360,6 +379,10 @@ menuentry "Start NetbootCD-Neo $NBCDVER" {
     initrd /boot/nbinit4.gz
 }
 
+menuentry "Boot netboot.xyz" {
+    chainloader /boot/netboot.xyz.efi
+}
+
 menuentry "Boot from hard disk" {
     exit
 }
@@ -370,7 +393,7 @@ grub-mkstandalone \
     -d "$GRUB_MODULES_DIR" \
     --modules="iso9660 linux search search_fs_file normal configfile \
                fat part_gpt part_msdos all_video gfxterm font \
-               boot echo halt reboot ls cat" \
+               boot echo halt reboot ls cat chain" \
     --locales="" \
     --themes="" \
     -o "${WORK}/efifiles/EFI/BOOT/BOOTx64.EFI" \

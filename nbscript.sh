@@ -51,6 +51,50 @@ getversion ()
 }
 
 
+# Download URL ($1) to OUT ($2) showing a dialog --gauge progress bar with
+# LABEL ($3).  We HEAD the URL to learn the expected size, then run wget in
+# the background and poll the output file's size.  Falls back to plain $WGET
+# if the server doesn't expose a Content-Length.  Designed to work with both
+# GNU and BusyBox wget (TinyCore ships BusyBox by default).
+wgetgauge ()
+{
+	_url="$1"
+	_out="$2"
+	_label="$3"
+
+	_size=$(wget --no-check-certificate --spider -S -T 10 "$_url" 2>&1 \
+		| grep -i 'content-length:' | tail -1 | tr -d '\r' | awk '{print $2}')
+	[ -z "$_size" ] && _size=0
+	case "$_size" in *[!0-9]*) _size=0 ;; esac
+
+	if [ "$_size" -le 0 ]; then
+		$WGET "$_url" -O "$_out"
+		return $?
+	fi
+
+	rm -f "$_out" /tmp/nb-wget-rc
+	( set +e; $WGET -q "$_url" -O "$_out"; echo $? >/tmp/nb-wget-rc ) &
+	_wpid=$!
+
+	(
+		set +e
+		while [ ! -f /tmp/nb-wget-rc ]; do
+			_now=$(wc -c < "$_out" 2>/dev/null || echo 0)
+			_pct=$(( _now * 100 / _size ))
+			[ "$_pct" -gt 100 ] && _pct=100
+			printf '%d\n' "$_pct"
+			sleep 1
+		done
+		printf '100\n'
+	) | dialog --backtitle "$TITLE" --gauge "$_label" 8 70 0
+
+	wait "$_wpid" 2>/dev/null || true
+	_rc=$(cat /tmp/nb-wget-rc 2>/dev/null || echo 1)
+	rm -f /tmp/nb-wget-rc
+	return "$_rc"
+}
+
+
 askforopts ()
 {
 #Extra kernel options can be useful in some cases; i.e. hardware problems, Debian preseeding, or maybe you just want to utilise your whole 1280x1024 monitor (use: vga=794).
@@ -281,6 +325,7 @@ DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
 if [ $DISTRO = "ubuntu" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	resolute "Ubuntu 26.04 LTS (Subiquity)" \
 	noble "Ubuntu 24.04 LTS (Subiquity)" \
 	jammy "Ubuntu 22.04 LTS" \
 	focal "Ubuntu 20.04 LTS" \
@@ -293,7 +338,14 @@ if [ $DISTRO = "ubuntu" ];then
 		INITRDURL="https://releases.ubuntu.com/noble/netboot/amd64/initrd"
 		ISODEFAULT="https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso"
 		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu live-server ISO:" 8 70 "$ISODEFAULT" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
-		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl)" >>/tmp/nb-options
+		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl) console=tty0 nosplash plymouth.enable=0" >>/tmp/nb-options
+		rm /tmp/nb-isourl
+	elif [ "$VERSION" = "resolute" ]; then
+		KERNELURL="https://releases.ubuntu.com/resolute/netboot/amd64/linux"
+		INITRDURL="https://releases.ubuntu.com/resolute/netboot/amd64/initrd"
+		ISODEFAULT="https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso"
+		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu live-server ISO:" 8 70 "$ISODEFAULT" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
+		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl) console=tty0 nosplash plymouth.enable=0" >>/tmp/nb-options
 		rm /tmp/nb-isourl
 	else
 		#Set the URL to download the kernel and initrd from. The server used here is archive.ubuntu.com.
@@ -555,14 +607,9 @@ if [ $DISTRO = "slackware" ];then
 	slackware64-14.2 "Slackware 14.2" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	dialog --backtitle "$TITLE" --menu "Choose a kernel type:" 20 70 13 \
-	huge.s "" \
-	hugesmp.s "" 2>/tmp/nb-kerntype || { rm -f /tmp/nb-kerntype; return; }
-	KERNTYPE=$(cat /tmp/nb-kerntype)
-	rm /tmp/nb-kerntype
-	KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/$KERNTYPE/bzImage"
+	KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/huge.s/bzImage"
 	INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
-	echo -n "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=$KERNTYPE" >>/tmp/nb-options
+	echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
 fi
 
 if [ $DISTRO = "rescue" ];then
@@ -618,9 +665,9 @@ if [ $DISTRO = "rescue" ];then
 fi
 askforopts
 #Now download the kernel and initrd.
-$WGET $KERNELURL -O /tmp/nb-linux
+wgetgauge "$KERNELURL" /tmp/nb-linux "Downloading kernel from $KERNELURL"
 if [ -n "${INITRDURL:-}" ]; then
-	$WGET $INITRDURL -O /tmp/nb-initrd
+	wgetgauge "$INITRDURL" /tmp/nb-initrd "Downloading initrd from $INITRDURL"
 fi
 }
 
@@ -675,17 +722,35 @@ fi
 #This checks to make sure you are indeed on a TCB system.
 if [ -d /home/tc ];then
 	CMDLINE="$(cat /tmp/nb-options) $(cat /tmp/nb-custom)"
-	echo kexec $ARGS --command-line="$CMDLINE"
+
+	dialog --backtitle "$TITLE" --title " Executing " --infobox \
+"kexec $ARGS --command-line=\"$CMDLINE\"
+
+Loading kernel and booting new system..." 15 80 || true
+
 	# On UEFI systems, prefer kexec_file_load (-s) which preserves the EFI
 	# memory map and system table for the incoming kernel.  Fall back to the
 	# classic kexec_load syscall if -s is not compiled in (e.g. 32-bit kernel).
+	rm -f /tmp/nb-kexec.log
+	_krc=0
 	if [ $EFIMODE = 1 ] && kexec --help 2>&1 | grep -q -- '-s'; then
-		kexec -s $ARGS --command-line="$CMDLINE" 2>/dev/null || \
-		kexec $ARGS --command-line="$CMDLINE"
+		kexec -s $ARGS --command-line="$CMDLINE" >>/tmp/nb-kexec.log 2>&1 || \
+			kexec $ARGS --command-line="$CMDLINE" >>/tmp/nb-kexec.log 2>&1 || \
+			_krc=$?
 	else
-		kexec $ARGS --command-line="$CMDLINE"
+		kexec $ARGS --command-line="$CMDLINE" >>/tmp/nb-kexec.log 2>&1 || _krc=$?
 	fi
+
+	if [ "$_krc" -ne 0 ]; then
+		dialog --backtitle "$TITLE" --title " kexec load failed " \
+			--textbox /tmp/nb-kexec.log 20 80 || true
+		rm -f /tmp/nb-kexec.log
+		exit "$_krc"
+	fi
+	rm -f /tmp/nb-kexec.log
+
 	sleep 5
 	sync
+	clear
 	kexec -e
 fi
