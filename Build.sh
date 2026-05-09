@@ -32,9 +32,10 @@ NBINIT=${WORK}/nbinit
 cleanup() {
     rm -rf "${WORK:-}" squashfs-root opt
     rm -f "vmlinuz64-${COREVER}" "corepure64-${COREVER}.gz" \
-          "kexec-tools-${KEXEC_VER}.tar.xz" \
-          "dialog-x86_64.tcz" "ncursesw-x86_64.tcz" "openssl-x86_64.tcz" \
-          "firmware-rtl_nic-x86_64.tcz" "firmware-cavium_nic-x86_64.tcz"
+          "kexec-tools-${KEXEC_VER}.tar.xz"
+    for _pkg in ${CACHED_TCZ_PKGS:-}; do
+        rm -f "${_pkg}-x86_64.tcz"
+    done
     for _pkg in ${WIFI_PKGS_ALL:-}; do
         rm -f "${_pkg}-x86_64.tcz"
     done
@@ -45,6 +46,8 @@ NBCDVER=17.0
 COREVER=17.0
 KEXEC_VER=2.0.32
 TCX64="http://distro.ibiblio.org/tinycorelinux/${COREVER%.*}.x/x86_64"
+BASE_TCZ_PKGS="dialog ncursesw openssl 7zip zstd libzstd xz liblzma liblz4 firmware-lan firmware-rtl_nic firmware-cavium_nic"
+CACHED_TCZ_PKGS="$BASE_TCZ_PKGS firmware-broadcom_bnx2 firmware-broadcom_bnx2x"
 
 # --- Locate GRUB EFI modules directory ---
 GRUB_MODULES_DIR=""
@@ -77,8 +80,7 @@ if [ ! -f "corepure64-${COREVER}.gz" ]; then
 fi
 
 # x86_64 TCZ packages (downloaded once, cached locally)
-for pkg in dialog ncursesw openssl firmware-lan firmware-rtl_nic \
-firmware-cavium_nic firmware-lan firmware-broadcom_bnx2 firmware-broadcom_bnx2x; do
+for pkg in $CACHED_TCZ_PKGS; do
     if [ ! -f "${pkg}-x86_64.tcz" ]; then
         wget "$TCX64/tcz/${pkg}.tcz" -O "${pkg}-x86_64.tcz"
     fi
@@ -99,6 +101,7 @@ echo "Detected kernel version: $KVER"
 WIFI_PKGS="wifi wpa_supplicant-dbus iw wireless-${KVER} wireless-regdb wireless_tools \
     firmware-atheros \
     firmware-broadcom_bcm43xx firmware-broadcom_bnx2 firmware-broadcom_bnx2x \
+    firmware-cavium_nic \
     firmware-ipw2100 firmware-ipw2200 firmware-iwimax \
     firmware-iwl8000 firmware-iwl9000 firmware-iwlax20x firmware-iwlwifi \
     firmware-lan firmware-marvel firmware-mediatek firmware-mellanox \
@@ -106,8 +109,7 @@ WIFI_PKGS="wifi wpa_supplicant-dbus iw wireless-${KVER} wireless-regdb wireless_
     firmware-openfwwf firmware-qca firmware-qed \
     firmware-ralinkwifi firmware-rtl_nic firmware-rtlwifi \
     firmware-ti-connectivity firmware-tigon \
-    firmware-vxge firmware-wlan firmware-zd1211 \
-    firmware-rtl_nic-x86_64.tcz firmware-cavium_nic-x86_64.tcz"
+    firmware-vxge firmware-wlan firmware-zd1211"
 # Download a TCZ package plus all of its transitive dependencies by reading
 # the .tcz.dep file that TinyCore publishes alongside each package.
 # Discovered names accumulate in WIFI_PKGS_ALL for extraction and cleanup.
@@ -248,7 +250,7 @@ cp -v nbscript.sh "${NBINIT}/usr/bin"
 
 # x86_64 TCZ packages
 if [ -e squashfs-root ]; then rm -r squashfs-root; fi
-for pkg in dialog ncursesw openssl firmware-lan firmware-rtl_nic; do
+for pkg in $BASE_TCZ_PKGS; do
     unsquashfs "${pkg}-x86_64.tcz"
     cp -a squashfs-root/* "${NBINIT}"
     rm -r squashfs-root

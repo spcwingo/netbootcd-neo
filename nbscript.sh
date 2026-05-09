@@ -50,6 +50,747 @@ getversion ()
 	rm /tmp/nb-version
 }
 
+getisourl ()
+{
+	ISODEFAULT="$1"
+	ISOLABEL="${2:-Ubuntu live ISO}"
+	ISOURL=
+
+	if dialog --backtitle "$TITLE" --yesno \
+		"Use this $ISOLABEL?\n\n$ISODEFAULT" 10 70; then
+		ISOURL="$ISODEFAULT"
+	else
+		_rc=$?
+		[ "$_rc" -eq 1 ] || return 1
+		printf 'URL for the %s [%s]: ' "$ISOLABEL" "$ISODEFAULT"
+		read ISOURL
+		ISOURL="${ISOURL:-$ISODEFAULT}"
+	fi
+
+	[ -n "$ISOURL" ]
+}
+
+ubuntu_live_iso ()
+{
+	KERNELURL="$1"
+	INITRDURL="$2"
+	getisourl "$3" "$4" || return 1
+	echo -n "root=/dev/ram0 ramdisk_size=3500000 ip=dhcp url=$ISOURL cloud-config-url=/dev/null ---" >>/tmp/nb-options
+}
+
+ubuntu_live_server ()
+{
+	ubuntu_live_iso "$1" "$2" "$3" "Ubuntu live-server ISO"
+}
+
+nb_error ()
+{
+	dialog --backtitle "$TITLE" --msgbox "$1" 8 70 || true
+}
+
+ARTIX_ISO_BASE="http://mirrors.ocf.berkeley.edu/artix-iso"
+
+artix_iso_file ()
+{
+	case "$1" in
+		base-dinit) printf '%s\n' 'artix-base-dinit-20250407-x86_64.iso' ;;
+		base-openrc) printf '%s\n' 'artix-base-openrc-20250407-x86_64.iso' ;;
+		base-runit) printf '%s\n' 'artix-base-runit-20250407-x86_64.iso' ;;
+		base-s6) printf '%s\n' 'artix-base-s6-20250407-x86_64.iso' ;;
+		*) return 1 ;;
+	esac
+}
+
+artix_iso_url ()
+{
+	_artix_iso_file="$1"
+	printf '%s/%s\n' "$ARTIX_ISO_BASE" "$_artix_iso_file"
+}
+
+artix_7z_cmd ()
+{
+	if command -v 7zz >/dev/null 2>&1; then
+		printf '%s\n' 7zz
+	elif command -v 7z >/dev/null 2>&1; then
+		printf '%s\n' 7z
+	else
+		return 1
+	fi
+}
+
+artix_dns_option ()
+{
+	_artix_dns_list=
+
+	if [ -r /etc/resolv.conf ]; then
+		while read -r _artix_resolv_key _artix_resolv_value _artix_resolv_rest; do
+			[ "$_artix_resolv_key" = "nameserver" ] || continue
+			[ -n "$_artix_resolv_value" ] || continue
+			case "$_artix_resolv_value" in
+				*,*|*[!A-Za-z0-9:.]*)
+					continue
+					;;
+			esac
+			case ",$_artix_dns_list," in
+				*,"$_artix_resolv_value",*) ;;
+				,,)
+					_artix_dns_list="$_artix_resolv_value"
+					;;
+				*)
+					_artix_dns_list="$_artix_dns_list,$_artix_resolv_value"
+					;;
+			esac
+		done </etc/resolv.conf
+	fi
+
+	[ -n "$_artix_dns_list" ] && printf ' netbootcd_dns=%s' "$_artix_dns_list"
+}
+
+artix_iso_setup ()
+{
+	_artix_iso_tag="$1"
+
+	if ! _artix_iso_file=$(artix_iso_file "$_artix_iso_tag"); then
+		nb_error "Unknown Artix ISO entry: $_artix_iso_tag"
+		return 1
+	fi
+
+	ARTIX_ISO_URL=$(artix_iso_url "$_artix_iso_file")
+	echo -n "ip=dhcp artix_iso_url=$ARTIX_ISO_URL$(artix_dns_option) " >>/tmp/nb-options
+}
+
+artix_add_network_modules_overlay ()
+{
+	_artix_iso="$1"
+	_overlay_dir="$2"
+	_rootfs_dir="/tmp/nb-artix-rootfs-extract"
+	_rootfs_img="$_rootfs_dir/rootfs.img"
+
+	[ -f "$_artix_iso" ] || return 0
+	if ! _artix_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract Artix network modules."
+		return 1
+	fi
+
+	rm -rf "$_rootfs_dir"
+	mkdir -p "$_rootfs_dir"
+
+	if ! "$_artix_7z" e -y -o"$_rootfs_dir" "$_artix_iso" LiveOS/rootfs.img >/tmp/nb-artix-network.log 2>&1; then
+		nb_error "Could not extract LiveOS/rootfs.img for Artix network module support.\nSee /tmp/nb-artix-network.log for details."
+		rm -rf "$_rootfs_dir"
+		return 1
+	fi
+
+	if ! "$_artix_7z" x -y -o"$_overlay_dir" "$_rootfs_img" \
+		'usr/lib/modules/*/modules.*' \
+		'usr/lib/modules/*/kernel/drivers/net/virtio_net.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/net_failover.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/mii.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/mdio.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/phy/libphy.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/phy/mdio_devres.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/phy/phylink.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/phy/realtek.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/amd/pcnet32.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/intel/e1000/e1000.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/intel/e1000e/e1000e.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/intel/igb/igb.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/intel/ixgbe/ixgbe.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/realtek/8139cp.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/realtek/8139too.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/ethernet/realtek/r8169.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/net/vmxnet3/vmxnet3.ko.zst' \
+		'usr/lib/modules/*/kernel/drivers/virtio/*.ko.zst' >>/tmp/nb-artix-network.log 2>&1; then
+		nb_error "Could not extract Artix network modules from rootfs.img.\nSee /tmp/nb-artix-network.log for details."
+		rm -rf "$_rootfs_dir"
+		return 1
+	fi
+
+	rm -rf "$_rootfs_dir"
+}
+
+make_artix_iso_overlay ()
+{
+	_artix_iso_url="$1"
+	_artix_iso="$2"
+	_overlay_dir="/tmp/nb-artix-overlay"
+
+	if ! command -v cpio >/dev/null 2>&1; then
+		nb_error "cpio is required to build the Artix ISO overlay."
+		return 1
+	fi
+
+	rm -rf "$_overlay_dir" /tmp/nb-artix-overlay.cpio
+	mkdir -p "$_overlay_dir/hooks"
+	printf '%s\n' "$_artix_iso_url" >"$_overlay_dir/.nb-artix-iso-url"
+
+	cat >"$_overlay_dir/hooks/netbootcd_artix_iso" <<'EOFH'
+# vim: set ft=sh:
+
+run_hook() {
+    msg ":: NetbootCD Artix ISO hook starting..."
+    _nb_artix_iso_url="${artix_iso_url:-}"
+    [ -r /.nb-artix-iso-url ] && _nb_artix_iso_url="$(cat /.nb-artix-iso-url)"
+    [ -z "${root:-}" ] && root="LiveOS"
+
+    if [ -n "${_nb_artix_iso_url:-}" ]; then
+        msg ":: Setting up NetbootCD Artix ISO download"
+        artix_iso_url="$_nb_artix_iso_url"
+        [ -z "${artix_http_spc:-}" ] && artix_http_spc="85%"
+        mount_handler="netbootcd_artix_iso_mount_handler"
+    else
+        msg ":: NetbootCD Artix ISO hook skipped: no ISO URL"
+    fi
+}
+
+_nb_fetch_url() {
+    _url="$1"
+    _out="$2"
+
+    mkdir -p "${_out%/*}"
+    msg ":: Downloading '${_url}'"
+
+    if _nb_try_fetch_url "$_url" "$_out"; then
+        return
+    fi
+
+    msg ":: Download failed, retrying after network/DNS refresh"
+    netbootcd_artix_iso_network
+    if _nb_try_fetch_url "$_url" "$_out"; then
+        return
+    fi
+
+    echo "ERROR: Downloading '${_url}'"
+    echo "   Falling back to interactive prompt"
+    launch_interactive_shell
+}
+
+_nb_try_fetch_url() {
+    _url="$1"
+    _out="$2"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -k -L -f -o "$_out" "$_url" && return
+    fi
+    if command -v wget >/dev/null 2>&1; then
+        wget --no-check-certificate -O "$_out" "$_url" && return
+    fi
+
+    return 1
+}
+
+_nb_busybox() {
+    if command -v busybox >/dev/null 2>&1; then
+        busybox "$@"
+        return $?
+    fi
+    if [ -x /usr/bin/busybox ]; then
+        /usr/bin/busybox "$@"
+        return $?
+    fi
+    if [ -x /bin/busybox ]; then
+        /bin/busybox "$@"
+        return $?
+    fi
+    return 127
+}
+
+_nb_ifconfig() {
+    if command -v ifconfig >/dev/null 2>&1; then
+        ifconfig "$@"
+        return $?
+    fi
+    _nb_busybox ifconfig "$@"
+}
+
+_nb_route() {
+    if command -v route >/dev/null 2>&1; then
+        route "$@"
+        return $?
+    fi
+    _nb_busybox route "$@"
+}
+
+netbootcd_artix_iso_udhcpc_script() {
+    cat >/tmp/netbootcd-udhcpc.script <<'EOFS'
+#!/bin/sh
+case "$1" in
+    bound|renew)
+        if command -v ifconfig >/dev/null 2>&1; then
+            ifconfig "$interface" "$ip" netmask "$subnet" ${broadcast:+broadcast "$broadcast"} up
+        elif [ -x /usr/bin/busybox ]; then
+            /usr/bin/busybox ifconfig "$interface" "$ip" netmask "$subnet" ${broadcast:+broadcast "$broadcast"} up
+        elif [ -x /bin/busybox ]; then
+            /bin/busybox ifconfig "$interface" "$ip" netmask "$subnet" ${broadcast:+broadcast "$broadcast"} up
+        fi
+
+        if command -v route >/dev/null 2>&1; then
+            route del default 2>/dev/null || true
+            for r in $router; do route add default gw "$r" dev "$interface" 2>/dev/null || true; break; done
+        elif [ -x /usr/bin/busybox ]; then
+            /usr/bin/busybox route del default 2>/dev/null || true
+            for r in $router; do /usr/bin/busybox route add default gw "$r" dev "$interface" 2>/dev/null || true; break; done
+        elif [ -x /bin/busybox ]; then
+            /bin/busybox route del default 2>/dev/null || true
+            for r in $router; do /bin/busybox route add default gw "$r" dev "$interface" 2>/dev/null || true; break; done
+        fi
+
+        : >/etc/resolv.conf
+        set -- $dns
+        [ -n "$1" ] && printf 'nameserver %s\n' "$1" >>/etc/resolv.conf
+        [ -n "$2" ] && printf 'nameserver %s\n' "$2" >>/etc/resolv.conf
+        [ -n "$domain" ] && printf 'search %s\n' "$domain" >>/etc/resolv.conf
+
+        {
+            printf 'DEVICE=%s\n' "$interface"
+            printf 'IPV4ADDR=%s\n' "$ip"
+            printf 'IPV4BROADCAST=%s\n' "$broadcast"
+            printf 'IPV4NETMASK=%s\n' "$subnet"
+            set -- $router
+            printf 'IPV4GATEWAY=%s\n' "$1"
+            set -- $dns
+            printf 'IPV4DNS0=%s\n' "$1"
+            printf 'IPV4DNS1=%s\n' "$2"
+            printf 'DNSDOMAIN=%s\n' "$domain"
+        } >"/tmp/net-${interface}.conf"
+        ;;
+esac
+EOFS
+    chmod 0755 /tmp/netbootcd-udhcpc.script
+}
+
+netbootcd_artix_iso_resolv_conf() {
+    _nb_dns_written=0
+
+    if [ -n "${netbootcd_dns:-}" ]; then
+        : >/etc/resolv.conf
+        _nb_dns_list="$netbootcd_dns"
+        while [ -n "$_nb_dns_list" ]; do
+            case "$_nb_dns_list" in
+                *,*)
+                    _nb_dns="${_nb_dns_list%%,*}"
+                    _nb_dns_list="${_nb_dns_list#*,}"
+                    ;;
+                *)
+                    _nb_dns="$_nb_dns_list"
+                    _nb_dns_list=
+                    ;;
+            esac
+            [ -n "$_nb_dns" ] || continue
+            printf 'nameserver %s\n' "$_nb_dns" >>/etc/resolv.conf
+            _nb_dns_written=1
+        done
+    fi
+
+    if [ "$_nb_dns_written" -eq 0 ]; then
+        for _nb_netconf in /tmp/net-*.conf; do
+            [ -f "$_nb_netconf" ] || continue
+            IPV4DNS0=
+            IPV4DNS1=
+            DNSDOMAIN=
+            . "$_nb_netconf"
+            : >/etc/resolv.conf
+            if [ -n "${IPV4DNS0:-}" ] && [ "$IPV4DNS0" != "0.0.0.0" ]; then
+                printf 'nameserver %s\n' "$IPV4DNS0" >>/etc/resolv.conf
+                _nb_dns_written=1
+            fi
+            if [ -n "${IPV4DNS1:-}" ] && [ "$IPV4DNS1" != "0.0.0.0" ]; then
+                printf 'nameserver %s\n' "$IPV4DNS1" >>/etc/resolv.conf
+                _nb_dns_written=1
+            fi
+            if [ -n "${DNSDOMAIN:-}" ]; then
+                printf 'search %s\n' "$DNSDOMAIN" >>/etc/resolv.conf
+                printf 'domain %s\n' "$DNSDOMAIN" >>/etc/resolv.conf
+            fi
+            break
+        done
+    fi
+
+    if ! grep -q '^nameserver ' /etc/resolv.conf 2>/dev/null; then
+        {
+            echo "# added by NetbootCD Artix hook"
+            echo "nameserver 1.1.1.1"
+            echo "nameserver 8.8.8.8"
+        } >/etc/resolv.conf
+    fi
+}
+
+netbootcd_artix_iso_load_net_modules() {
+    for _nb_module in virtio_net e1000 e1000e pcnet32 vmxnet3 8139cp 8139too r8169 igb ixgbe; do
+        modprobe "$_nb_module" 2>/dev/null || true
+    done
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm trigger --subsystem-match=net --action=add 2>/dev/null || true
+        udevadm settle --timeout=5 2>/dev/null || true
+    fi
+    sleep 2
+}
+
+netbootcd_artix_iso_dhcp() {
+    [ -n "${ip:-}" ] || return 1
+
+    netbootcd_artix_iso_load_net_modules
+
+    rm -f /tmp/net-*.conf
+    if command -v ipconfig >/dev/null 2>&1; then
+        msg ":: Configuring network for Artix ISO download (${ip})"
+        if ipconfig -t 30 "ip=${ip}"; then
+            return 0
+        fi
+    fi
+
+    netbootcd_artix_iso_udhcpc_script
+    for _nb_iface_path in /sys/class/net/*; do
+        [ -e "$_nb_iface_path" ] || continue
+        _nb_iface="${_nb_iface_path##*/}"
+        [ "$_nb_iface" = "lo" ] && continue
+        msg ":: Trying DHCP on ${_nb_iface}"
+        rm -f /tmp/net-*.conf
+        if command -v ipconfig >/dev/null 2>&1; then
+            if ipconfig -t 30 "ip=:::::${_nb_iface}:dhcp"; then
+                return 0
+            fi
+        fi
+        _nb_ifconfig "$_nb_iface" up 2>/dev/null || true
+        if _nb_busybox udhcpc -i "$_nb_iface" -n -q -t 5 -T 5 -s /tmp/netbootcd-udhcpc.script; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+netbootcd_artix_iso_network() {
+    if ! netbootcd_artix_iso_dhcp; then
+        msg ":: NetbootCD Artix hook could not configure DHCP automatically"
+    fi
+    netbootcd_artix_iso_resolv_conf
+}
+
+netbootcd_artix_iso_mount_handler () {
+    newroot="$1"
+
+    msg ":: Mounting ${live_root}/httpspace (tmpfs) filesystem, size='${artix_http_spc}'"
+    mkdir -p "${live_root}/httpspace"
+    mount -t tmpfs -o size="${artix_http_spc}",mode=0755 httpspace "${live_root}/httpspace"
+
+    _nb_iso_path="${live_root}/httpspace/artix.iso"
+    netbootcd_artix_iso_network
+    _nb_fetch_url "$artix_iso_url" "$_nb_iso_path"
+
+    modprobe loop 2>/dev/null || true
+    modprobe isofs 2>/dev/null || true
+    modprobe udf 2>/dev/null || true
+    if _nb_iso_dev=$(losetup --find --show --read-only "$_nb_iso_path"); then
+        artixdevice="$_nb_iso_dev"
+    else
+        echo "ERROR: Could not create a loop device for '${_nb_iso_path}'"
+        echo "   Falling back to interactive prompt"
+        launch_interactive_shell
+    fi
+
+    artix_mount_handler "$newroot"
+}
+EOFH
+	chmod 0755 "$_overlay_dir/hooks/netbootcd_artix_iso"
+
+	if ! artix_add_network_modules_overlay "$_artix_iso" "$_overlay_dir"; then
+		rm -rf "$_overlay_dir" /tmp/nb-artix-overlay.cpio
+		return 1
+	fi
+
+	if ! ( cd "$_overlay_dir" && find . | cpio -o -H newc >/tmp/nb-artix-overlay.cpio ); then
+		nb_error "Could not build the Artix ISO overlay."
+		rm -rf "$_overlay_dir" /tmp/nb-artix-overlay.cpio
+		return 1
+	fi
+
+	rm -rf "$_overlay_dir"
+}
+
+artix_file_size ()
+{
+	wc -c <"$1" | tr -d '[:space:]'
+}
+
+artix_initrd_format_at ()
+{
+	_artix_initrd="$1"
+	_artix_offset="${2:-0}"
+	_artix_sig=$(dd if="$_artix_initrd" bs=1 skip="$_artix_offset" count=6 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
+
+	case "$_artix_sig" in
+		1f8b*) printf '%s\n' gzip ;;
+		28b52ffd*) printf '%s\n' zstd ;;
+		fd377a585a00*) printf '%s\n' xz ;;
+		303730373031*) printf '%s\n' cpio ;;
+		*) return 1 ;;
+	esac
+}
+
+artix_initrd_format ()
+{
+	artix_initrd_format_at "$1" 0
+}
+
+artix_cpio_blocks_offset ()
+{
+	_artix_initrd="$1"
+	_artix_blocks_file="/tmp/nb-artix-cpio-blocks"
+
+	rm -f "$_artix_blocks_file"
+	if ! ( cpio -t <"$_artix_initrd" >/dev/null 2>"$_artix_blocks_file" ); then
+		rm -f "$_artix_blocks_file"
+		return 1
+	fi
+	_artix_blocks=$(sed -n 's/^\([0-9][0-9]*\)[[:space:]]*blocks.*/\1/p' "$_artix_blocks_file" | tail -1)
+	rm -f "$_artix_blocks_file"
+	case "$_artix_blocks" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	printf '%s\n' "$(( _artix_blocks * 512 ))"
+}
+
+artix_find_main_initrd ()
+{
+	_artix_initrd="$1"
+
+	if ! _artix_format=$(artix_initrd_format "$_artix_initrd"); then
+		return 1
+	fi
+	if [ "$_artix_format" != "cpio" ]; then
+		printf '%s %s\n' "$_artix_format" 0
+		return 0
+	fi
+
+	if ! _artix_scan=$(artix_cpio_blocks_offset "$_artix_initrd"); then
+		printf '%s %s\n' cpio 0
+		return 0
+	fi
+	_artix_size=$(artix_file_size "$_artix_initrd")
+	_artix_limit=$(( _artix_scan + 1048576 ))
+	[ "$_artix_limit" -gt "$_artix_size" ] && _artix_limit="$_artix_size"
+
+	while [ "$_artix_scan" -lt "$_artix_limit" ]; do
+		_artix_byte=$(dd if="$_artix_initrd" bs=1 skip="$_artix_scan" count=1 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
+		[ -z "$_artix_byte" ] && break
+		if [ "$_artix_byte" = "00" ]; then
+			_artix_scan=$(( _artix_scan + 1 ))
+			continue
+		fi
+		if _artix_tail_format=$(artix_initrd_format_at "$_artix_initrd" "$_artix_scan"); then
+			printf '%s %s\n' "$_artix_tail_format" "$_artix_scan"
+			return 0
+		fi
+		break
+	done
+
+	printf '%s %s\n' cpio 0
+}
+
+artix_repack_initrd_fragments ()
+{
+	_artix_count="$1"
+	_artix_last="/tmp/nb-initrd.$_artix_count"
+	_artix_work="/tmp/nb-artix-initrd-work"
+	_artix_repacked="/tmp/nb-initrd.repacked"
+
+	if ! _artix_main_info=$(artix_find_main_initrd "$_artix_last"); then
+		nb_error "Could not determine the Artix initramfs compression format."
+		return 1
+	fi
+	_artix_format="${_artix_main_info%% *}"
+	_artix_main_offset="${_artix_main_info#* }"
+
+	if [ "$_artix_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "Artix initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_artix_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "Artix initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_artix_work" "$_artix_repacked" /tmp/nb-initrd
+	mkdir -p "$_artix_work"
+
+	case "$_artix_format" in
+		gzip)
+			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | gzip -cd | ( cd "$_artix_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Artix gzip initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | zstd -dc | ( cd "$_artix_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Artix zstd initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | xz -dc | ( cd "$_artix_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Artix xz initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | ( cd "$_artix_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Artix cpio initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+	esac
+
+	if ! ( cd "$_artix_work" && cpio -idmu </tmp/nb-artix-overlay.cpio ); then
+		nb_error "Could not merge the Artix ISO overlay into the initramfs."
+		rm -rf "$_artix_work"
+		return 1
+	fi
+	if [ -f "$_artix_work/config" ] && ! grep -q 'netbootcd_artix_iso' "$_artix_work/config"; then
+		if grep -q '^HOOKS="' "$_artix_work/config"; then
+			if ! sed 's/^HOOKS="\([^"]*\)"/HOOKS="\1 netbootcd_artix_iso"/' "$_artix_work/config" >"$_artix_work/config.new"; then
+				nb_error "Could not update the Artix initramfs hook list."
+				rm -rf "$_artix_work" "$_artix_repacked" "$_artix_work/config.new"
+				return 1
+			fi
+			mv "$_artix_work/config.new" "$_artix_work/config"
+		else
+			printf '\nHOOKS="${HOOKS} netbootcd_artix_iso"\n' >>"$_artix_work/config"
+		fi
+	fi
+
+	case "$_artix_format" in
+		gzip)
+			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | gzip -c >"$_artix_repacked" ); then
+				nb_error "Could not repack the Artix gzip initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | zstd -q -c >"$_artix_repacked" ); then
+				nb_error "Could not repack the Artix zstd initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | xz -c >"$_artix_repacked" ); then
+				nb_error "Could not repack the Artix xz initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_artix_work" && find . | cpio -o -H newc >"$_artix_repacked" ); then
+				nb_error "Could not repack the Artix cpio initramfs."
+				rm -rf "$_artix_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd
+	_artix_i=1
+	while [ "$_artix_i" -lt "$_artix_count" ]; do
+		cat "/tmp/nb-initrd.$_artix_i" >>/tmp/nb-initrd
+		_artix_i=$(( _artix_i + 1 ))
+	done
+	if [ "$_artix_main_offset" -gt 0 ]; then
+		if ! head -c "$_artix_main_offset" "$_artix_last" >>/tmp/nb-initrd; then
+			nb_error "Could not preserve the Artix early initramfs prefix."
+			rm -rf "$_artix_work" "$_artix_repacked" /tmp/nb-artix-overlay.cpio /tmp/nb-initrd.*
+			return 1
+		fi
+	fi
+	if ! cat "$_artix_repacked" >>/tmp/nb-initrd; then
+		nb_error "Could not append the repacked Artix initramfs."
+		rm -rf "$_artix_work" "$_artix_repacked" /tmp/nb-artix-overlay.cpio /tmp/nb-initrd.*
+		return 1
+	fi
+	rm -rf "$_artix_work" "$_artix_repacked" /tmp/nb-artix-overlay.cpio /tmp/nb-initrd.*
+}
+
+combine_initrd_fragments ()
+{
+	_initrd_count="$1"
+
+	: >/tmp/nb-initrd
+	_initrd_i=1
+	while [ "$_initrd_i" -le "$_initrd_count" ]; do
+		cat "/tmp/nb-initrd.$_initrd_i" >>/tmp/nb-initrd
+		rm -f "/tmp/nb-initrd.$_initrd_i"
+		_initrd_i=$(( _initrd_i + 1 ))
+	done
+}
+
+artix_prepare_from_iso ()
+{
+	_artix_iso_url="$1"
+	_artix_iso="/tmp/nb-artix.iso"
+	_artix_boot="/tmp/nb-artix-boot"
+
+	if ! _artix_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract Artix ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.* "$_artix_iso" /tmp/nb-artix-overlay.cpio
+	rm -rf "$_artix_boot"
+	mkdir -p "$_artix_boot"
+
+	if ! wgetgauge "$_artix_iso_url" "$_artix_iso" "Downloading Artix ISO"; then
+		nb_error "Could not download Artix ISO from:\n\n$_artix_iso_url"
+		rm -f "$_artix_iso"
+		rm -rf "$_artix_boot"
+		return 1
+	fi
+
+	if ! "$_artix_7z" e -y -o"$_artix_boot" "$_artix_iso" \
+		boot/vmlinuz-x86_64 \
+		boot/intel-ucode.img \
+		boot/amd-ucode.img \
+		boot/initramfs-x86_64.img >/tmp/nb-artix-7z.log 2>&1; then
+		nb_error "Could not extract Artix boot files from the ISO.\nSee /tmp/nb-artix-7z.log for details."
+		rm -f "$_artix_iso"
+		rm -rf "$_artix_boot"
+		return 1
+	fi
+
+	for _artix_file in vmlinuz-x86_64 intel-ucode.img amd-ucode.img initramfs-x86_64.img; do
+		if [ ! -s "$_artix_boot/$_artix_file" ]; then
+			nb_error "The Artix ISO did not contain boot/$_artix_file."
+			rm -f "$_artix_iso"
+			rm -rf "$_artix_boot"
+			return 1
+		fi
+	done
+
+	mv "$_artix_boot/vmlinuz-x86_64" /tmp/nb-linux
+	mv "$_artix_boot/intel-ucode.img" /tmp/nb-initrd.1
+	mv "$_artix_boot/amd-ucode.img" /tmp/nb-initrd.2
+	mv "$_artix_boot/initramfs-x86_64.img" /tmp/nb-initrd.3
+	rm -rf "$_artix_boot"
+
+	if ! make_artix_iso_overlay "$_artix_iso_url" "$_artix_iso"; then
+		rm -f "$_artix_iso"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.* /tmp/nb-artix-overlay.cpio
+		return 1
+	fi
+	rm -f "$_artix_iso"
+	if ! artix_repack_initrd_fragments 3; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.* /tmp/nb-artix-overlay.cpio
+		return 1
+	fi
+
+	rm -f /tmp/nb-artix-7z.log
+	return 0
+}
+
 
 # Download URL ($1) to OUT ($2) showing a dialog --gauge progress bar with
 # LABEL ($3).  We HEAD the URL to learn the expected size, then run wget in
@@ -62,7 +803,7 @@ wgetgauge ()
 	_out="$2"
 	_label="$3"
 
-	_size=$(wget --no-check-certificate --spider -S -T 10 "$_url" 2>&1 \
+	_size=$($WGET --spider -S -T 10 "$_url" 2>&1 \
 		| grep -i 'content-length:' | tail -1 | tr -d '\r' | awk '{print $2}')
 	[ -z "$_size" ] && _size=0
 	case "$_size" in *[!0-9]*) _size=0 ;; esac
@@ -73,6 +814,7 @@ wgetgauge ()
 	fi
 
 	rm -f "$_out" /tmp/nb-wget-rc
+	: > "$_out"
 	( set +e; $WGET -q "$_url" -O "$_out"; echo $? >/tmp/nb-wget-rc ) &
 	_wpid=$!
 
@@ -302,8 +1044,12 @@ ipadrmenu ()
 
 installmenu ()
 {
-dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 17 \
+KERNELURL=
+INITRDURL=
+ARTIX_ISO_URL=
+dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 19 \
 ubuntu "Ubuntu" \
+ubuntuflavor "Ubuntu flavors" \
 debian "Debian GNU/Linux" \
 debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
@@ -317,8 +1063,10 @@ rhel-type-8 "AlmaLinux 8 / CentOS 8 / Rocky Linux 8" \
 rhel-type-7 "CentOS 7 and Scientific Linux 7" \
 rhel-type-6 "CentOS 6 and Scientific Linux 6" \
 cloudlinux "CloudLinux 8 / CloudLinux 9" \
+rhel-extra "RHEL-compatible extras" \
 openeuler "openEuler" \
 arch "Arch Linux" \
+artix "Artix Linux" \
 slackware "Slackware" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
@@ -327,26 +1075,30 @@ if [ $DISTRO = "ubuntu" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	resolute "Ubuntu 26.04 LTS (Subiquity)" \
 	noble "Ubuntu 24.04 LTS (Subiquity)" \
-	jammy "Ubuntu 22.04 LTS" \
+	jammy "Ubuntu 22.04 LTS (Subiquity)" \
 	focal "Ubuntu 20.04 LTS" \
 	bionic "Ubuntu 18.04 LTS" \
 	xenial "Ubuntu 16.04 LTS" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	if [ "$VERSION" = "noble" ]; then
-		KERNELURL="https://releases.ubuntu.com/noble/netboot/amd64/linux"
-		INITRDURL="https://releases.ubuntu.com/noble/netboot/amd64/initrd"
-		ISODEFAULT="https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso"
-		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu live-server ISO:" 8 70 "$ISODEFAULT" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
-		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl) console=tty0 nosplash plymouth.enable=0" >>/tmp/nb-options
-		rm /tmp/nb-isourl
+		ubuntu_live_server \
+			"https://releases.ubuntu.com/noble/netboot/amd64/linux" \
+			"https://releases.ubuntu.com/noble/netboot/amd64/initrd" \
+			"https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso" || return
 	elif [ "$VERSION" = "resolute" ]; then
-		KERNELURL="https://releases.ubuntu.com/resolute/netboot/amd64/linux"
-		INITRDURL="https://releases.ubuntu.com/resolute/netboot/amd64/initrd"
-		ISODEFAULT="https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso"
-		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu live-server ISO:" 8 70 "$ISODEFAULT" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
-		echo -n "ip=dhcp iso-url=$(cat /tmp/nb-isourl) console=tty0 nosplash plymouth.enable=0" >>/tmp/nb-options
-		rm /tmp/nb-isourl
+		ubuntu_live_server \
+			"https://releases.ubuntu.com/resolute/netboot/amd64/linux" \
+			"https://releases.ubuntu.com/resolute/netboot/amd64/initrd" \
+			"https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso" || return
+	elif [ "$VERSION" = "jammy" ]; then
+		# Canonical no longer publishes the old jammy debian-installer
+		# netboot images.  Use netboot.xyz's ISO-extracted live-server
+		# kernel/initrd pair and let casper fetch the official ISO.
+		ubuntu_live_server \
+			"https://github.com/netbootxyz/ubuntu-squash/releases/download/22.04.5-be230164/vmlinuz" \
+			"https://github.com/netbootxyz/ubuntu-squash/releases/download/22.04.5-be230164/initrd" \
+			"https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso" || return
 	else
 		#Set the URL to download the kernel and initrd from. The server used here is archive.ubuntu.com.
 		KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
@@ -367,6 +1119,60 @@ if [ $DISTRO = "ubuntu" ];then
 			echo -n 'tasks=standard pkgsel/language-pack-patterns= pkgsel/install-language-support=false'>>/tmp/nb-options
 		fi
 	fi
+fi
+if [ $DISTRO = "ubuntuflavor" ];then
+	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor to boot:" 20 75 13 \
+	kubuntu-26.04 "Kubuntu 26.04 LTS" \
+	xubuntu-26.04 "Xubuntu 26.04 LTS" \
+	lubuntu-26.04 "Lubuntu 26.04 LTS" \
+	budgie-26.04 "Ubuntu Budgie 26.04 LTS" \
+	cinnamon-26.04 "Ubuntu Cinnamon 26.04 LTS" \
+	studio-26.04 "Ubuntu Studio 26.04 LTS" \
+	unity-26.04 "Ubuntu Unity 26.04 LTS" \
+	edubuntu-26.04 "Edubuntu 26.04 LTS" \
+	mate-24.04 "Ubuntu MATE 24.04.4 LTS" \
+	Manual "Manually enter an Ubuntu flavor ISO URL" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	UBUNTU_KERNEL_SERIES="resolute"
+	if [ "$VERSION" = "kubuntu-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/kubuntu/releases/26.04/release/kubuntu-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "xubuntu-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/xubuntu/releases/26.04/release/xubuntu-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "lubuntu-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/lubuntu/releases/26.04/release/lubuntu-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "budgie-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/ubuntu-budgie/releases/26.04/release/ubuntu-budgie-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "cinnamon-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/ubuntucinnamon/releases/26.04/release/ubuntucinnamon-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "studio-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/ubuntustudio/releases/26.04/release/ubuntustudio-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "unity-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/ubuntu-unity/releases/26.04/release/ubuntu-unity-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "edubuntu-26.04" ]; then
+		ISODEFAULT="https://cdimage.ubuntu.com/edubuntu/releases/26.04/release/edubuntu-26.04-desktop-amd64.iso"
+	elif [ "$VERSION" = "mate-24.04" ]; then
+		UBUNTU_KERNEL_SERIES="noble"
+		ISODEFAULT="https://cdimage.ubuntu.com/ubuntu-mate/releases/24.04/release/ubuntu-mate-24.04.4-desktop-amd64.iso"
+	else
+		ISODEFAULT=
+	fi
+	if [ "$VERSION" = "Manual" ]; then
+		UBUNTU_KERNEL_SERIES="resolute"
+		dialog --backtitle "$TITLE" --inputbox "URL for the Ubuntu flavor live ISO:" 8 70 "" 2>/tmp/nb-isourl || { rm -f /tmp/nb-isourl; return; }
+		ISODEFAULT=$(cat /tmp/nb-isourl)
+		rm /tmp/nb-isourl
+	fi
+	if [ -z "$ISODEFAULT" ]; then
+		dialog --backtitle "$TITLE" --msgbox \
+			"No Ubuntu flavor ISO URL was selected." 6 50 || true
+		return 1
+	fi
+	ubuntu_live_iso \
+		"https://releases.ubuntu.com/$UBUNTU_KERNEL_SERIES/netboot/amd64/linux" \
+		"https://releases.ubuntu.com/$UBUNTU_KERNEL_SERIES/netboot/amd64/initrd" \
+		"$ISODEFAULT" \
+		"Ubuntu flavor live ISO" || return
 fi
 if [ $DISTRO = "debian" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -416,22 +1222,21 @@ if [ $DISTRO = "q4os" ];then
 fi
 if [ $DISTRO = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
- 	development/44/Server "Fedora 44" \
-	releases/43/Server "Fedora 43" \
-	releases/42/Server "Fedora 42" \
-	development/rawhide "Rawhide" \
+	releases/44/Server "Fedora Server 44" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os/" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	KERNELURL="$(cat /tmp/nb-server)/images/pxeboot/vmlinuz"
-	INITRDURL="$(cat /tmp/nb-server)/images/pxeboot/initrd.img"
-	echo -n "inst.stage2=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	dialog --inputbox "Where do you want to install Fedora from?" 8 70 "http://mirrors.kernel.org/fedora/$VERSION/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	SERVER=$(cat /tmp/nb-server)
+	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
+	INITRDURL="$SERVER/images/pxeboot/initrd.img"
+	echo -n "inst.stage2=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ $DISTRO = "opensuse" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	tumbleweed "openSUSE Tumbleweed" \
 	slowroll "openSUSE Slowroll" \
+	leap/16.0 "openSUSE Leap 16.0" \
 	leap/15.6 "openSUSE Leap 15.6" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
@@ -578,12 +1383,96 @@ if [ $DISTRO = "cloudlinux" ];then
 	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
+if [ $DISTRO = "rhel-extra" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	opencloudos-9 "OpenCloudOS 9 latest" \
+	opencloudos-9.4 "OpenCloudOS 9.4" \
+	opencloudos-9.2 "OpenCloudOS 9.2" \
+	opencloudos-8.10 "OpenCloudOS 8.10" \
+	eurolinux-9.4 "EuroLinux 9.4" \
+	eurolinux-8.10 "EuroLinux 8.10" \
+	springdale-9.2 "Springdale Linux 9.2" \
+	springdale-8.8 "Springdale Linux 8.8" \
+	clearos-7 "ClearOS 7.9" \
+	smeserver-11.0-beta1 "Koozali SME Server 11.0 Beta 1" \
+	smeserver-10.1 "Koozali SME Server 10.1" \
+	tencentos-4.6 "TencentOS Server 4.6" \
+	tencentos-3.3 "TencentOS Server 3.3" \
+	custom "Custom RHEL-compatible installer tree" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	if [ "$VERSION" = "opencloudos-9" ];then
+		DISTNAME="OpenCloudOS"
+		SERVERDEFAULT="https://mirrors.opencloudos.org/opencloudos/9/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "opencloudos-9.4" ];then
+		DISTNAME="OpenCloudOS"
+		SERVERDEFAULT="https://mirrors.opencloudos.org/opencloudos/9.4/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "opencloudos-9.2" ];then
+		DISTNAME="OpenCloudOS"
+		SERVERDEFAULT="https://mirrors.opencloudos.org/opencloudos/9.2/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "opencloudos-8.10" ];then
+		DISTNAME="OpenCloudOS"
+		SERVERDEFAULT="https://mirrors.opencloudos.org/opencloudos/8.10/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "eurolinux-9.4" ];then
+		DISTNAME="EuroLinux"
+		SERVERDEFAULT="https://vault.cdn.euro-linux.com/legacy/eurolinux/9/9.4/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "eurolinux-8.10" ];then
+		DISTNAME="EuroLinux"
+		SERVERDEFAULT="https://vault.cdn.euro-linux.com/legacy/eurolinux/8/8.10/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "springdale-9.2" ];then
+		DISTNAME="Springdale Linux"
+		SERVERDEFAULT="http://springdale.princeton.edu/data/puias/9.2/x86_64/os"
+	elif [ "$VERSION" = "springdale-8.8" ];then
+		DISTNAME="Springdale Linux"
+		SERVERDEFAULT="http://springdale.princeton.edu/data/puias/8.8/x86_64/os"
+	elif [ "$VERSION" = "clearos-7" ];then
+		DISTNAME="ClearOS"
+		SERVERDEFAULT="https://mirror.math.princeton.edu/pub/clearos/7.9.1.342252/os/x86_64"
+	elif [ "$VERSION" = "smeserver-11.0-beta1" ];then
+		DISTNAME="Koozali SME Server"
+		SERVERDEFAULT="https://distro.ibiblio.org/smeserver/releases/testing/11/smeos/x86_64"
+	elif [ "$VERSION" = "smeserver-10.1" ];then
+		DISTNAME="Koozali SME Server"
+		SERVERDEFAULT="https://distro.ibiblio.org/smeserver/releases/10.1/smeos/x86_64"
+	elif [ "$VERSION" = "tencentos-4.6" ];then
+		DISTNAME="TencentOS Server"
+		SERVERDEFAULT="https://mirrors.tencent.com/tlinux/4.6/BaseOS/x86_64/os"
+	elif [ "$VERSION" = "tencentos-3.3" ];then
+		DISTNAME="TencentOS Server"
+		SERVERDEFAULT="https://mirrors.tencent.com/tlinux/3.3/BaseOS/x86_64/os"
+	else
+		DISTNAME="this RHEL-compatible distribution"
+		SERVERDEFAULT=
+	fi
+	dialog --backtitle "$TITLE" --inputbox "Where do you want to install $DISTNAME from?" 8 70 "$SERVERDEFAULT" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
+	SERVER=$(cat /tmp/nb-server)
+	if [ -z "$SERVER" ];then
+		dialog --backtitle "$TITLE" --msgbox \
+			"No installer repository URL was entered." 6 50 || true
+		rm -f /tmp/nb-server
+		return 1
+	fi
+	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
+	INITRDURL="$SERVER/images/pxeboot/initrd.img"
+	if [ "$VERSION" = "smeserver-10.1" ];then
+		echo -n "ip=dhcp initcall_blacklist=clocksource_done_booting inst.stage2=$SERVER inst.ks=$SERVER/Packages/base/sme-kickstart.cfg quiet" >>/tmp/nb-options
+	elif [ "$VERSION" = "smeserver-11.0-beta1" ];then
+		echo -n "ip=dhcp initcall_blacklist=clocksource_done_booting inst.stage2=$SERVER inst.repo=$SERVER quiet" >>/tmp/nb-options
+	elif [ "$VERSION" = "tencentos-4.6" ] || [ "$VERSION" = "tencentos-3.3" ];then
+		echo -n "ip=dhcp nomodeset inst.stage2=$SERVER inst.repo=$SERVER inst.noverifyssl" >>/tmp/nb-options
+	else
+		echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
+	fi
+	rm /tmp/nb-server
+fi
 if [ $DISTRO = "openeuler" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	24.03-LTS-SP3 "openEuler 24.03 LTS SP3" \
+	24.03-LTS-SP2 "openEuler 24.03 LTS SP2" \
 	24.03-LTS-SP1 "openEuler 24.03 LTS SP1" \
 	24.03-LTS "openEuler 24.03 LTS" \
-	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
 	25.03 "openEuler 25.03" \
+	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
 	Manual "Manually enter a version to install (e.g. 24.03-LTS)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	dialog --inputbox "Where do you want to install openEuler from?" 8 70 "https://repo.openeuler.org/openEuler-$VERSION/everything/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
@@ -595,23 +1484,47 @@ if [ $DISTRO = "openeuler" ];then
 fi
 if [ $DISTRO = "arch" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	latest "Arch x86_64" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	latest "Arch x86_64" \
+	archboot-latest "Archboot latest installer" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	KERNELURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/vmlinuz-linux"
-	INITRDURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/initramfs-linux.img"
-	echo -n 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
+	if [ "$VERSION" = "archboot-latest" ];then
+		BASE="https://release.archboot.com/x86_64/latest/ipxe"
+		KERNELURL="$BASE/vmlinuz"
+		INITRDURL="$BASE/amd-ucode.img $BASE/intel-ucode.img $BASE/initrd-latest-x86_64.img"
+		echo -n 'vga=normal quiet ip=dhcp net.ifnames=0 '>>/tmp/nb-options
+	else
+		KERNELURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/vmlinuz-linux"
+		INITRDURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/initramfs-linux.img"
+		echo -n 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
+	fi
+fi
+if [ $DISTRO = "artix" ];then
+	dialog --backtitle "$TITLE" --menu "Choose an Artix system to boot:" 12 70 4 \
+	base-dinit "Base dinit" \
+	base-openrc "Base OpenRC" \
+	base-runit "Base runit" \
+	base-s6 "Base s6" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	artix_iso_setup "$VERSION" || return
 fi
 if [ $DISTRO = "slackware" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	slackware64-current "Slackware64-current" \
 	slackware64-15.0 "Slackware 15.0" \
 	slackware64-14.2 "Slackware 14.2" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/huge.s/bzImage"
-	INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
-	echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
+	if [ "$VERSION" = "slackware64-current" ];then
+		KERNELURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/generic.s/bzImage"
+		INITRDURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
+		echo -n "rw printk.time=0 nomodeset SLACK_KERNEL=generic.s" >>/tmp/nb-options
+	else
+		KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/huge.s/bzImage"
+		INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
+		echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
+	fi
 fi
-
 if [ $DISTRO = "rescue" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
 	gparted           "GParted Live 1.8.1-3" \
@@ -664,10 +1577,42 @@ if [ $DISTRO = "rescue" ];then
 	fi
 fi
 askforopts
-#Now download the kernel and initrd.
-wgetgauge "$KERNELURL" /tmp/nb-linux "Downloading kernel from $KERNELURL"
-if [ -n "${INITRDURL:-}" ]; then
-	wgetgauge "$INITRDURL" /tmp/nb-initrd "Downloading initrd from $INITRDURL"
+# Now download or prepare the selected boot files.
+if [ -n "${ARTIX_ISO_URL:-}" ]; then
+	if ! artix_prepare_from_iso "$ARTIX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.* /tmp/nb-artix-overlay.cpio
+		return 1
+	fi
+else
+	if [ -z "${KERNELURL:-}" ]; then
+		dialog --backtitle "$TITLE" --msgbox \
+			"No kernel URL was selected for this entry." 6 50 || true
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	if ! wgetgauge "$KERNELURL" /tmp/nb-linux "Downloading kernel"; then
+		dialog --backtitle "$TITLE" --msgbox \
+			"Could not download kernel from:\n\n$KERNELURL" 9 70 || true
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	if [ -n "${INITRDURL:-}" ]; then
+		rm -f /tmp/nb-initrd /tmp/nb-initrd.*
+		_INITRD_COUNT=0
+		# INITRDURL may contain multiple space-separated initrd fragments.
+		# BusyBox ash has no arrays, so split intentionally on spaces here.
+		for _INITRD_URL in $INITRDURL; do
+			_INITRD_COUNT=$(( _INITRD_COUNT + 1 ))
+			_INITRD_OUT="/tmp/nb-initrd.$_INITRD_COUNT"
+			if ! wgetgauge "$_INITRD_URL" "$_INITRD_OUT" "Downloading initrd"; then
+				dialog --backtitle "$TITLE" --msgbox \
+					"Could not download initrd from:\n\n$_INITRD_URL" 9 70 || true
+				rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+				return 1
+			fi
+		done
+		combine_initrd_fragments "$_INITRD_COUNT"
+	fi
 fi
 }
 
