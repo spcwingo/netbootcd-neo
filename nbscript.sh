@@ -38,6 +38,7 @@ EFIMODE=0
 # TLS handshake unless we skip verification.  --tries=3 retries transient
 # connection resets automatically.
 WGET="wget --no-check-certificate --tries=3"
+NBSCRIPT_UPDATE_URL="https://raw.githubusercontent.com/spcwingo/netbootcd-neo/refs/heads/main/nbscript.sh"
 
 getversion ()
 {
@@ -97,6 +98,31 @@ ubuntu_casper_iso_setup ()
 nb_error ()
 {
 	dialog --backtitle "$TITLE" --msgbox "$1" 8 70 || true
+}
+
+downloadandrun ()
+{
+	_nbscript_url="$1"
+	_nbscript_new="/tmp/nbscript-new.sh"
+	rm -f "$_nbscript_new"
+	if $WGET -O "$_nbscript_new" "$_nbscript_url"; then
+		if [ ! -s "$_nbscript_new" ]; then
+			rm -f "$_nbscript_new"
+			nb_error "The downloaded NetbootCD-Neo script was empty.\n\nURL:\n$_nbscript_url"
+			return 1
+		fi
+		if ! sh -n "$_nbscript_new" 2>/tmp/nbscript-new.err; then
+			rm -f "$_nbscript_new"
+			nb_error "The downloaded NetbootCD-Neo script did not pass a shell syntax check.\n\nURL:\n$_nbscript_url"
+			return 1
+		fi
+		chmod 755 "$_nbscript_new"
+		exec "$_nbscript_new"
+	fi
+	_nbscript_rc=$?
+	rm -f "$_nbscript_new"
+	nb_error "Downloading the newest NetbootCD-Neo script was not successful.\n\nURL:\n$_nbscript_url"
+	return "$_nbscript_rc"
 }
 
 DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
@@ -2515,6 +2541,7 @@ fi
 while true; do
 	dialog --backtitle "$TITLE" --menu "What would you like to do?" 16 70 9 \
 	install "Install or boot a Linux system" \
+	update  "Download and run newest nbscript.sh" \
 	wifi    "Configure wireless network" \
 	ipaddr  "View/release IP address" \
 	quit    "Quit to prompt (do not reboot)" 2>/tmp/nb-mainmenu || { rm -f /tmp/nb-mainmenu; continue; }
@@ -2529,6 +2556,10 @@ while true; do
 		rm -f /tmp/nb-linux /tmp/nb-initrd
 		installmenu || true
 		if [ -f /tmp/nb-linux ]; then break; fi
+		continue
+	fi
+	if [ "$MAINMENU" = "update" ]; then
+		downloadandrun "$NBSCRIPT_UPDATE_URL" || true
 		continue
 	fi
 	if [ "$MAINMENU" = "wifi" ]; then
