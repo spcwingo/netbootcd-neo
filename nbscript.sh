@@ -83,12 +83,541 @@ ubuntu_live_server ()
 	ubuntu_live_iso "$1" "$2" "$3" "Ubuntu live-server ISO"
 }
 
+ubuntu_casper_iso_setup ()
+{
+	DEBIAN_LIVE_LABEL="$1"
+	DEBIAN_LIVE_ISO_URL="$2"
+	DEBIAN_LIVE_BOOT_URL="${4:-$2}"
+	DEBIAN_LIVE_MODE=casper-url
+	DEBIAN_LIVE_KERNEL_PATHS="casper/vmlinuz casper/vmlinuz.efi live/vmlinuz boot/vmlinuz boot/vmlinuz-*"
+	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst"
+	echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
+}
+
 nb_error ()
 {
 	dialog --backtitle "$TITLE" --msgbox "$1" 8 70 || true
 }
 
+DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
+DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
+DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
+
+debian_live_iso_setup ()
+{
+	_debian_live_tag="$1"
+	DEBIAN_LIVE_ISO_URL=
+	DEBIAN_LIVE_BOOT_URL=
+	DEBIAN_LIVE_LABEL=
+	DEBIAN_LIVE_MODE=fetch
+	DEBIAN_LIVE_BOOT_STYLE=debian-live
+	DEBIAN_LIVE_OPTIONS=
+	DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
+	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
+	DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
+
+	case "$_debian_live_tag" in
+		butterbian-xfce)
+			DEBIAN_LIVE_LABEL="Butterbian Xfce 0.2.1"
+			DEBIAN_LIVE_ISO_URL="https://get.butterbian.org/butterbian-xfce-0.2.1-trixie-20260504.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=butterbian"
+			;;
+		butterknife)
+			DEBIAN_LIVE_LABEL="Butterknife 0.1.11"
+			DEBIAN_LIVE_ISO_URL="https://get.butterbian.org/butterknife-0.1.11-trixie-20260504.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=butterknife"
+			;;
+		bunsenlabs-carbon)
+			DEBIAN_LIVE_LABEL="BunsenLabs Carbon 1"
+			DEBIAN_LIVE_ISO_URL="http://ddl.bunsenlabs.org/ddl/carbon-1-260211-amd64.hybrid.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=bunsenlabs"
+			;;
+		emmabuntus-de6-core)
+			DEBIAN_LIVE_LABEL="Emmabuntus DE6 Core"
+			DEBIAN_LIVE_ISO_URL="http://cfhcable.dl.sourceforge.net/project/emmabuntus/Emmabuntus_DE6/Images/1.01/emmabuntus-de6-core-amd64-13.4-1.01.iso?viasf=1&fid=d15787c9fd137e59"
+			DEBIAN_LIVE_BOOT_URL="http://downloads.sourceforge.net/project/emmabuntus/Emmabuntus_DE6/Images/1.01/emmabuntus-de6-core-amd64-13.4-1.01.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=emmabuntus"
+			;;
+		locos-24)
+			DEBIAN_LIVE_LABEL="Loc-OS 24"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/loc-os/Loc-OS%2024/Loc-OS-24-current_amd64.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=loc-os"
+			;;
+		mauna-christian)
+			DEBIAN_LIVE_LABEL="Mauna Linux 25.2 Christian Edition"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/maunalinux/ISO/25.2/MaunaLinux-25.2-Christian-Edition-amd64.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=mauna"
+			;;
+		minios-standard)
+			DEBIAN_LIVE_LABEL="MiniOS 5.1.1 Standard"
+			DEBIAN_LIVE_ISO_URL="https://github.com/minios-linux/minios-live/releases/download/v5.1.1/minios-trixie-xfce-standard-amd64-5.1.1.iso"
+			DEBIAN_LIVE_MODE=minios-embed
+			DEBIAN_LIVE_KERNEL_PATHS="minios/boot/vmlinuz minios/boot/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
+			DEBIAN_LIVE_INITRD_PATHS="minios/boot/initrfs.img minios/boot/initrfs-*.img minios/boot/initrd.img minios/boot/initrd.img-* boot/initrd.img boot/initrd.img-*"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=minios"
+			;;
+		nakedeb-16)
+			DEBIAN_LIVE_LABEL="nakeDeb 1.6"
+			DEBIAN_LIVE_ISO_URL="https://nakedeb.arpinux.org/download/nakedeb-1.6-202603-amd64.iso"
+			DEBIAN_LIVE_OPTIONS="username=human hostname=nakedeb"
+			;;
+		neptune-91)
+			DEBIAN_LIVE_LABEL="Neptune 9.1"
+			DEBIAN_LIVE_ISO_URL="https://download.neptuneos.com/download/Neptune9-20260314.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=neptune"
+			;;
+		refracta-xfce)
+			DEBIAN_LIVE_LABEL="Refracta 13.3 Xfce"
+			DEBIAN_LIVE_ISO_URL="https://get.refracta.org/files/stable/refracta_13.3_xfce_amd64-20260501_1208.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=refracta"
+			;;
+		refracta-nox)
+			DEBIAN_LIVE_LABEL="Refracta 13.3 noX"
+			DEBIAN_LIVE_ISO_URL="https://get.refracta.org/files/stable/refracta_13.3_nox_amd64-20260501_1521.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=refracta"
+			;;
+		solydx-13)
+			DEBIAN_LIVE_LABEL="SolydX 13"
+			DEBIAN_LIVE_ISO_URL="http://ftp.nluug.nl/os/Linux/distr/solydxk/downloads/solydx_13_64_202512.iso"
+			DEBIAN_LIVE_OPTIONS="username=solydxk hostname=solydx"
+			;;
+		wattos-r13)
+			DEBIAN_LIVE_LABEL="wattOS R13"
+			DEBIAN_LIVE_ISO_URL="http://extantpc.com/iso/wattOS-R13.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=wattos"
+			;;
+		*)
+			nb_error "Unknown Debian-based live ISO entry: $_debian_live_tag"
+			return 1
+			;;
+	esac
+
+	[ -n "$DEBIAN_LIVE_BOOT_URL" ] || DEBIAN_LIVE_BOOT_URL="$DEBIAN_LIVE_ISO_URL"
+	case "$_debian_live_tag" in
+		refracta-*)
+			DEBIAN_LIVE_MODE=embed
+			;;
+	esac
+
+	if [ "$DEBIAN_LIVE_MODE" = "embed" ]; then
+		echo -n "boot=live config components live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+	elif [ "$DEBIAN_LIVE_MODE" = "minios-embed" ]; then
+		echo -n "boot=live $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+	else
+		echo -n "ip=dhcp boot=live config components fetch=$DEBIAN_LIVE_BOOT_URL ramdisk-size=85% noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+	fi
+}
+
+debian_live_extract_boot_file ()
+{
+	_debian_live_iso="$1"
+	_debian_live_out="$2"
+	_debian_live_desc="$3"
+	shift 3
+	_debian_live_out_dir="${_debian_live_out%/*}"
+	if [ "$_debian_live_out_dir" = "$_debian_live_out" ] || [ ! -d "$_debian_live_out_dir" ]; then
+		_debian_live_extract_dir="/tmp/nb-debian-live-extract"
+	else
+		_debian_live_extract_dir="$_debian_live_out_dir/nb-debian-live-extract"
+	fi
+
+	while [ "$#" -gt 0 ]; do
+		_debian_live_path="$1"
+		shift
+
+		rm -rf "$_debian_live_extract_dir"
+		mkdir -p "$_debian_live_extract_dir"
+		if "$DEBIAN_LIVE_7Z" e -y -o"$_debian_live_extract_dir" "$_debian_live_iso" "$_debian_live_path" >/tmp/nb-debian-live-7z.log 2>&1; then
+			_debian_live_found=
+			for _debian_live_candidate in "$_debian_live_extract_dir"/*; do
+				[ -f "$_debian_live_candidate" ] || continue
+				[ -s "$_debian_live_candidate" ] || continue
+				_debian_live_found="$_debian_live_candidate"
+				break
+			done
+			if [ -n "$_debian_live_found" ]; then
+				mv "$_debian_live_found" "$_debian_live_out"
+				rm -rf "$_debian_live_extract_dir"
+				return 0
+			fi
+		fi
+	done
+
+	nb_error "Could not extract $_debian_live_desc from the $DEBIAN_LIVE_LABEL ISO.\nSee /tmp/nb-debian-live-7z.log for details."
+	rm -rf "$_debian_live_extract_dir"
+	return 1
+}
+
+debian_live_repack_initrd_with_rootfs ()
+{
+	_debian_live_rootfs="$1"
+	_debian_live_parent="${_debian_live_rootfs%/*}"
+	_debian_live_work="$_debian_live_parent/initrd-work"
+	_debian_live_repacked="$_debian_live_parent/nb-initrd.repacked"
+	_debian_live_new="$_debian_live_parent/nb-initrd.new"
+	_debian_live_final="$_debian_live_parent/nb-initrd"
+
+	if ! _debian_live_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $DEBIAN_LIVE_LABEL initramfs compression format."
+		return 1
+	fi
+	_debian_live_format="${_debian_live_main_info%% *}"
+	_debian_live_main_offset="${_debian_live_main_info#* }"
+
+	if [ "$_debian_live_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$DEBIAN_LIVE_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_debian_live_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$DEBIAN_LIVE_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new" "$_debian_live_final"
+	mkdir -p "$_debian_live_work"
+
+	case "$_debian_live_format" in
+		gzip)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL gzip initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL zstd initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL xz initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL cpio initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$_debian_live_work/live"
+	if ! mv "$_debian_live_rootfs" "$_debian_live_work/live/filesystem.squashfs"; then
+		nb_error "Could not add the $DEBIAN_LIVE_LABEL live filesystem to the initramfs."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+
+	case "$_debian_live_format" in
+		gzip)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | gzip -1 -c >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL gzip initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | zstd -q -c >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL zstd initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL xz initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL cpio initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >"$_debian_live_new"
+	if [ "$_debian_live_main_offset" -gt 0 ]; then
+		if ! head -c "$_debian_live_main_offset" /tmp/nb-initrd >>"$_debian_live_new"; then
+			nb_error "Could not preserve the $DEBIAN_LIVE_LABEL early initramfs prefix."
+			rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_debian_live_repacked" >>"$_debian_live_new"; then
+		nb_error "Could not write the repacked $DEBIAN_LIVE_LABEL initramfs."
+		rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
+		return 1
+	fi
+	mv "$_debian_live_new" "$_debian_live_final"
+	rm -rf "$_debian_live_work" "$_debian_live_repacked"
+	rm -f /tmp/nb-initrd
+	ln -s "$_debian_live_final" /tmp/nb-initrd
+	return 0
+}
+
+debian_live_repack_initrd_with_minios_data ()
+{
+	_debian_live_iso="$1"
+	_debian_live_parent="${_debian_live_iso%/*}"
+	_debian_live_work="$_debian_live_parent/initrd-work"
+	_debian_live_repacked="$_debian_live_parent/nb-initrd.repacked"
+	_debian_live_new="$_debian_live_parent/nb-initrd.new"
+	_debian_live_final="$_debian_live_parent/nb-initrd"
+
+	if ! _debian_live_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract the $DEBIAN_LIVE_LABEL MiniOS data."
+		return 1
+	fi
+	if ! _debian_live_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $DEBIAN_LIVE_LABEL initramfs compression format."
+		return 1
+	fi
+	_debian_live_format="${_debian_live_main_info%% *}"
+	_debian_live_main_offset="${_debian_live_main_info#* }"
+
+	if [ "$_debian_live_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$DEBIAN_LIVE_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_debian_live_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$DEBIAN_LIVE_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new" "$_debian_live_final"
+	mkdir -p "$_debian_live_work"
+
+	case "$_debian_live_format" in
+		gzip)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL gzip initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL zstd initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL xz initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_debian_live_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL cpio initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+	esac
+
+	if ! "$_debian_live_7z" x -y -o"$_debian_live_work" "$_debian_live_iso" "minios/*" >/tmp/nb-debian-live-7z.log 2>&1; then
+		nb_error "Could not extract MiniOS data from the $DEBIAN_LIVE_LABEL ISO.\nSee /tmp/nb-debian-live-7z.log for details."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+	rm -f "$_debian_live_iso"
+
+	if [ ! -d "$_debian_live_work/minios" ]; then
+		nb_error "The $DEBIAN_LIVE_LABEL ISO did not contain a minios data directory."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+	_debian_live_has_sb=$(find "$_debian_live_work/minios" -name "*.sb" | head -1)
+	if [ -z "$_debian_live_has_sb" ]; then
+		nb_error "The $DEBIAN_LIVE_LABEL ISO did not contain MiniOS bundle files."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+
+	_debian_live_minios_init="$_debian_live_work/minios-init"
+	if [ ! -f "$_debian_live_minios_init" ]; then
+		_debian_live_minios_init=$(find "$_debian_live_work" -type f -name minios-init | head -1)
+	fi
+	if [ -z "$_debian_live_minios_init" ] || [ ! -f "$_debian_live_minios_init" ]; then
+		nb_error "Could not find the $DEBIAN_LIVE_LABEL minios-init script to patch."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+	if ! awk '
+		$0 == "DATA=\"$(find_data 45 \"$DATAMNT\")\"" {
+			print "if [ -d \"/minios\" ]; then"
+			print "   echo_white_star >&2"
+			print "   echo \"Using embedded MiniOS data\" >&2 >/dev/tty1"
+			print "   DATA=\"/minios\""
+			print "else"
+			print "   DATA=\"$(find_data 45 \"$DATAMNT\")\""
+			print "fi"
+			found=1
+			next
+		}
+		{ print }
+		END { if (!found) exit 1 }
+	' "$_debian_live_minios_init" >"$_debian_live_minios_init.tmp"; then
+		nb_error "Could not patch the $DEBIAN_LIVE_LABEL minios-init script."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+	if ! mv "$_debian_live_minios_init.tmp" "$_debian_live_minios_init"; then
+		nb_error "Could not write the patched $DEBIAN_LIVE_LABEL minios-init script."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
+	chmod 755 "$_debian_live_minios_init"
+
+	case "$_debian_live_format" in
+		gzip)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | gzip -1 -c >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL gzip initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | zstd -q -c >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL zstd initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL xz initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc >"$_debian_live_repacked" ); then
+				nb_error "Could not repack the $DEBIAN_LIVE_LABEL cpio initramfs."
+				rm -rf "$_debian_live_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >"$_debian_live_new"
+	if [ "$_debian_live_main_offset" -gt 0 ]; then
+		if ! head -c "$_debian_live_main_offset" /tmp/nb-initrd >>"$_debian_live_new"; then
+			nb_error "Could not preserve the $DEBIAN_LIVE_LABEL early initramfs prefix."
+			rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_debian_live_repacked" >>"$_debian_live_new"; then
+		nb_error "Could not write the repacked $DEBIAN_LIVE_LABEL initramfs."
+		rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
+		return 1
+	fi
+	mv "$_debian_live_new" "$_debian_live_final"
+	rm -rf "$_debian_live_work" "$_debian_live_repacked"
+	rm -f /tmp/nb-initrd
+	ln -s "$_debian_live_final" /tmp/nb-initrd
+	return 0
+}
+
+debian_live_prepare_from_iso ()
+{
+	_debian_live_iso_url="$1"
+	_debian_live_work="/tmp/nb-debian-live-work"
+	_debian_live_mount_dir="$_debian_live_work"
+	_debian_live_iso="$_debian_live_mount_dir/nb-debian-live.iso"
+	_debian_live_rootfs="$_debian_live_mount_dir/filesystem.squashfs"
+
+	if ! DEBIAN_LIVE_7Z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract Debian-based live ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_debian_live_mount_dir " /proc/mounts 2>/dev/null; then
+		umount "$_debian_live_mount_dir" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_debian_live_mount_dir" /tmp/nb-debian-live-extract
+	mkdir -p "$_debian_live_mount_dir"
+	_debian_live_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_debian_live_mount_dir" 2>/tmp/nb-debian-live-mount.log; then
+		_debian_live_mounted=1
+	fi
+
+	if ! wgetgauge "$_debian_live_iso_url" "$_debian_live_iso" "Downloading $DEBIAN_LIVE_LABEL ISO"; then
+		nb_error "Could not download $DEBIAN_LIVE_LABEL ISO from:\n\n$_debian_live_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+		rm -rf "$_debian_live_mount_dir"
+		return 1
+	fi
+
+	if ! debian_live_extract_boot_file "$_debian_live_iso" /tmp/nb-linux "kernel" $DEBIAN_LIVE_KERNEL_PATHS; then
+		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+		rm -rf "$_debian_live_mount_dir"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	if ! debian_live_extract_boot_file "$_debian_live_iso" /tmp/nb-initrd "initrd" $DEBIAN_LIVE_INITRD_PATHS; then
+		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+		rm -rf "$_debian_live_mount_dir"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	if [ "$DEBIAN_LIVE_MODE" = "minios-embed" ]; then
+		dialog --backtitle "$TITLE" --infobox \
+			"Embedding the $DEBIAN_LIVE_LABEL data directory into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+		if ! debian_live_repack_initrd_with_minios_data "$_debian_live_iso"; then
+			[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+			rm -rf "$_debian_live_mount_dir"
+			rm -f /tmp/nb-linux /tmp/nb-initrd
+			return 1
+		fi
+		rm -f "$_debian_live_iso" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
+		return 0
+	fi
+	if [ "$DEBIAN_LIVE_MODE" != "embed" ]; then
+		rm -f "$_debian_live_iso" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
+		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+		rm -rf "$_debian_live_mount_dir"
+		return 0
+	fi
+	if ! debian_live_extract_boot_file "$_debian_live_iso" "$_debian_live_rootfs" "live filesystem" $DEBIAN_LIVE_ROOTFS_PATHS; then
+		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+		rm -rf "$_debian_live_mount_dir"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	rm -f "$_debian_live_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $DEBIAN_LIVE_LABEL live filesystem into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! debian_live_repack_initrd_with_rootfs "$_debian_live_rootfs"; then
+		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+		rm -rf "$_debian_live_mount_dir"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f "$_debian_live_iso" "$_debian_live_rootfs" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
+	return 0
+}
+
 ARTIX_ISO_BASE="http://mirrors.ocf.berkeley.edu/artix-iso"
+VOID_ISO_BASE="http://repo-fastly.voidlinux.org/live/current"
+ALTLINUX_ISO_BASE="http://nightly.altlinux.org/sisyphus/current"
 
 artix_iso_file ()
 {
@@ -116,6 +645,310 @@ artix_7z_cmd ()
 	else
 		return 1
 	fi
+}
+
+iso_prepare_boot_files ()
+{
+	_iso_url="$1"
+	_iso_file="$2"
+	_boot_dir="$3"
+	_kernel_path="$4"
+	_initrd_path="$5"
+	_label="$6"
+
+	if ! _iso_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $_label boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd "$_iso_file"
+	rm -rf "$_boot_dir"
+	mkdir -p "$_boot_dir"
+
+	if ! wgetgauge "$_iso_url" "$_iso_file" "Downloading $_label ISO"; then
+		nb_error "Could not download $_label ISO from:\n\n$_iso_url"
+		rm -f "$_iso_file"
+		rm -rf "$_boot_dir"
+		return 1
+	fi
+
+	if ! "$_iso_7z" e -y -o"$_boot_dir" "$_iso_file" "$_kernel_path" "$_initrd_path" >/tmp/nb-iso-7z.log 2>&1; then
+		nb_error "Could not extract $_label boot files from the ISO.\nSee /tmp/nb-iso-7z.log for details."
+		rm -f "$_iso_file"
+		rm -rf "$_boot_dir"
+		return 1
+	fi
+
+	_kernel_file="${_kernel_path##*/}"
+	_initrd_file="${_initrd_path##*/}"
+
+	if [ ! -s "$_boot_dir/$_kernel_file" ]; then
+		nb_error "The $_label ISO did not contain $_kernel_path."
+		rm -f "$_iso_file"
+		rm -rf "$_boot_dir"
+		return 1
+	fi
+	if [ ! -s "$_boot_dir/$_initrd_file" ]; then
+		nb_error "The $_label ISO did not contain $_initrd_path."
+		rm -f "$_iso_file"
+		rm -rf "$_boot_dir"
+		return 1
+	fi
+
+	mv "$_boot_dir/$_kernel_file" /tmp/nb-linux
+	mv "$_boot_dir/$_initrd_file" /tmp/nb-initrd
+	rm -f "$_iso_file" /tmp/nb-iso-7z.log
+	rm -rf "$_boot_dir"
+	return 0
+}
+
+void_iso_file ()
+{
+	case "$1" in
+		glibc-base) printf '%s\n' 'void-live-x86_64-20250202-base.iso' ;;
+		glibc-xfce) printf '%s\n' 'void-live-x86_64-20250202-xfce.iso' ;;
+		musl-base) printf '%s\n' 'void-live-x86_64-musl-20250202-base.iso' ;;
+		musl-xfce) printf '%s\n' 'void-live-x86_64-musl-20250202-xfce.iso' ;;
+		*) return 1 ;;
+	esac
+}
+
+void_iso_url ()
+{
+	_void_iso_file="$1"
+	printf '%s/%s\n' "$VOID_ISO_BASE" "$_void_iso_file"
+}
+
+void_iso_setup ()
+{
+	_void_iso_tag="$1"
+
+	if ! _void_iso_file=$(void_iso_file "$_void_iso_tag"); then
+		nb_error "Unknown Void Linux ISO entry: $_void_iso_tag"
+		return 1
+	fi
+
+	VOID_ISO_URL=$(void_iso_url "$_void_iso_file")
+	echo -n "root=live:/LiveOS/squashfs.img init=/sbin/init ro rd.luks=0 rd.md=0 rd.dm=0 rd.live.overlay.overlayfs=1 loglevel=4 vconsole.unicode=1 locale.LANG=en_US.UTF-8 " >>/tmp/nb-options
+}
+
+void_repack_initrd_with_iso ()
+{
+	_void_iso="$1"
+	_void_work="/tmp/nb-void-initrd-work"
+	_void_repacked="/tmp/nb-initrd.void"
+
+	if ! _void_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract Void Linux live files."
+		return 1
+	fi
+	if ! _void_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the Void Linux initramfs compression format."
+		return 1
+	fi
+	_void_format="${_void_main_info%% *}"
+	_void_main_offset="${_void_main_info#* }"
+
+	if [ "$_void_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "Void Linux initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_void_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "Void Linux initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_void_work" "$_void_repacked"
+	mkdir -p "$_void_work"
+
+	case "$_void_format" in
+		gzip)
+			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_void_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Void Linux gzip initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_void_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Void Linux zstd initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_void_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Void Linux xz initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_void_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the Void Linux cpio initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+	esac
+
+	if ! "$_void_7z" x -y -o"$_void_work" "$_void_iso" LiveOS/squashfs.img >/tmp/nb-void-7z.log 2>&1; then
+		nb_error "Could not extract LiveOS/squashfs.img from the Void Linux ISO.\nSee /tmp/nb-void-7z.log for details."
+		rm -rf "$_void_work"
+		return 1
+	fi
+	if [ ! -s "$_void_work/LiveOS/squashfs.img" ]; then
+		nb_error "The Void Linux ISO did not contain LiveOS/squashfs.img."
+		rm -rf "$_void_work"
+		return 1
+	fi
+	rm -f "$_void_iso"
+
+	case "$_void_format" in
+		gzip)
+			if ! ( cd "$_void_work" && find . | cpio -o -H newc | gzip -c >"$_void_repacked" ); then
+				nb_error "Could not repack the Void Linux gzip initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_void_work" && find . | cpio -o -H newc | zstd -q -c >"$_void_repacked" ); then
+				nb_error "Could not repack the Void Linux zstd initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_void_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_void_repacked" ); then
+				nb_error "Could not repack the Void Linux xz initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_void_work" && find . | cpio -o -H newc >"$_void_repacked" ); then
+				nb_error "Could not repack the Void Linux cpio initramfs."
+				rm -rf "$_void_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_void_main_offset" -gt 0 ]; then
+		if ! head -c "$_void_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the Void Linux early initramfs prefix."
+			rm -rf "$_void_work" "$_void_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_void_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked Void Linux initramfs."
+		rm -rf "$_void_work" "$_void_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_void_work" "$_void_repacked" /tmp/nb-void-7z.log
+	return 0
+}
+
+void_prepare_from_iso ()
+{
+	_void_iso_url="$1"
+	_void_iso="/tmp/nb-void.iso"
+	_void_boot="/tmp/nb-void-boot"
+
+	if ! _void_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract Void Linux boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd "$_void_iso"
+	rm -rf "$_void_boot" /tmp/nb-void-initrd-work /tmp/nb-initrd.void /tmp/nb-initrd.new
+	mkdir -p "$_void_boot"
+
+	if ! wgetgauge "$_void_iso_url" "$_void_iso" "Downloading Void Linux ISO"; then
+		nb_error "Could not download Void Linux ISO from:\n\n$_void_iso_url"
+		rm -f "$_void_iso"
+		rm -rf "$_void_boot"
+		return 1
+	fi
+
+	if ! "$_void_7z" e -y -o"$_void_boot" "$_void_iso" boot/vmlinuz boot/initrd >/tmp/nb-void-7z.log 2>&1; then
+		nb_error "Could not extract Void Linux boot files from the ISO.\nSee /tmp/nb-void-7z.log for details."
+		rm -f "$_void_iso"
+		rm -rf "$_void_boot"
+		return 1
+	fi
+	if [ ! -s "$_void_boot/vmlinuz" ]; then
+		nb_error "The Void Linux ISO did not contain boot/vmlinuz."
+		rm -f "$_void_iso"
+		rm -rf "$_void_boot"
+		return 1
+	fi
+	if [ ! -s "$_void_boot/initrd" ]; then
+		nb_error "The Void Linux ISO did not contain boot/initrd."
+		rm -f "$_void_iso"
+		rm -rf "$_void_boot"
+		return 1
+	fi
+
+	mv "$_void_boot/vmlinuz" /tmp/nb-linux
+	mv "$_void_boot/initrd" /tmp/nb-initrd
+	rm -rf "$_void_boot"
+
+	if ! void_repack_initrd_with_iso "$_void_iso"; then
+		rm -f "$_void_iso"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.void
+		rm -rf /tmp/nb-void-initrd-work
+		return 1
+	fi
+
+	rm -f "$_void_iso" /tmp/nb-void-7z.log
+	return 0
+}
+
+altlinux_iso_file ()
+{
+	case "$1" in
+		regular-jeos-systemd) printf '%s\n' 'regular-net-install-latest-x86_64.iso' ;;
+		*) return 1 ;;
+	esac
+}
+
+altlinux_iso_url ()
+{
+	_altlinux_iso_file="$1"
+	printf '%s/%s\n' "$ALTLINUX_ISO_BASE" "$_altlinux_iso_file"
+}
+
+altlinux_iso_setup ()
+{
+	_altlinux_iso_tag="$1"
+
+	if ! _altlinux_iso_file=$(altlinux_iso_file "$_altlinux_iso_tag"); then
+		nb_error "Unknown ALT Linux ISO entry: $_altlinux_iso_tag"
+		return 1
+	fi
+
+	ALTLINUX_ISO_URL=$(altlinux_iso_url "$_altlinux_iso_file")
+	case "$_altlinux_iso_tag" in
+		regular-jeos-systemd)
+			_altlinux_stage_iso_file="regular-jeos-systemd-latest-x86_64.iso"
+			;;
+	esac
+
+	_altlinux_stage_iso_path="/sisyphus/current/$_altlinux_stage_iso_file"
+	# With method:http,type:iso, ramdisk_size makes ALT fetch /live instead of the ISO.
+	echo -n "fastboot live root=bootchain bootchain=fg,altboot ip=dhcp automatic=method:http,type:iso,server:nightly.altlinux.org,directory:$_altlinux_stage_iso_path stagename=live systemd.unit=install2.target lowmem lang=en_US " >>/tmp/nb-options
+}
+
+altlinux_prepare_from_iso ()
+{
+	_altlinux_iso_url="$1"
+
+	iso_prepare_boot_files "$_altlinux_iso_url" /tmp/nb-altlinux.iso /tmp/nb-altlinux-boot boot/vmlinuz boot/initrd.img "ALT Linux"
 }
 
 artix_dns_option ()
@@ -679,7 +1512,7 @@ artix_repack_initrd_fragments ()
 			fi
 			;;
 		xz)
-			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | xz -c >"$_artix_repacked" ); then
+			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_artix_repacked" ); then
 				nb_error "Could not repack the Artix xz initramfs."
 				rm -rf "$_artix_work"
 				return 1
@@ -813,9 +1646,35 @@ wgetgauge ()
 		return $?
 	fi
 
+	_out_dir="${_out%/*}"
+	[ "$_out_dir" = "$_out" ] && _out_dir=.
+	_avail_k=$(df -k "$_out_dir" 2>/dev/null | awk 'NR==2 {print $4}')
+	case "$_avail_k" in ''|*[!0-9]*) _avail_k=0 ;; esac
+	_need_k=$(( ( _size + 1023 ) / 1024 ))
+	if [ "$_avail_k" -gt 0 ] && [ "$_need_k" -gt "$_avail_k" ]; then
+		nb_error "Not enough temporary space to download:\n\n$_url\n\nRequired: ${_need_k} KB\nAvailable: ${_avail_k} KB\n\nTry again with more VM RAM, or choose a smaller ISO entry."
+		return 1
+	fi
+
 	rm -f "$_out" /tmp/nb-wget-rc
 	: > "$_out"
-	( set +e; $WGET -q "$_url" -O "$_out"; echo $? >/tmp/nb-wget-rc ) &
+	(
+		set +e
+		_attempt=1
+		_rc=1
+		while [ "$_attempt" -le 3 ]; do
+			if [ "$_attempt" -eq 1 ]; then
+				$WGET -q "$_url" -O "$_out"
+			else
+				$WGET -q -c "$_url" -O "$_out"
+			fi
+			_rc=$?
+			[ "$_rc" -eq 0 ] && break
+			_attempt=$(( _attempt + 1 ))
+			sleep 2
+		done
+		echo "$_rc" >/tmp/nb-wget-rc
+	) &
 	_wpid=$!
 
 	(
@@ -1047,26 +1906,32 @@ installmenu ()
 KERNELURL=
 INITRDURL=
 ARTIX_ISO_URL=
+VOID_ISO_URL=
+ALTLINUX_ISO_URL=
+DEBIAN_LIVE_ISO_URL=
+DEBIAN_LIVE_BOOT_URL=
+DEBIAN_LIVE_MODE=
 dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 19 \
 ubuntu "Ubuntu" \
-ubuntuflavor "Ubuntu flavors" \
+ubuntuflavor "Ubuntu flavors and derivatives" \
 debian "Debian GNU/Linux" \
 debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
+debianlive "Debian-based live installers" \
 q4os "Q4OS Trinity 6.6" \
 fedora "Fedora" \
 opensuse "openSUSE" \
 mageia "Mageia" \
 rhel-type-10 "AlmaLinux 10 / CentOS 10-Stream / Rocky Linux 10" \
 rhel-type-9 "AlmaLinux 9 / CentOS 9-Stream / Rocky Linux 9" \
-rhel-type-8 "AlmaLinux 8 / CentOS 8 / Rocky Linux 8" \
-rhel-type-7 "CentOS 7 and Scientific Linux 7" \
-rhel-type-6 "CentOS 6 and Scientific Linux 6" \
+rhel-type-8 "AlmaLinux 8 / Rocky Linux 8" \
 cloudlinux "CloudLinux 8 / CloudLinux 9" \
 rhel-extra "RHEL-compatible extras" \
 openeuler "openEuler" \
 arch "Arch Linux" \
 artix "Artix Linux" \
+void "Void Linux" \
+altlinux "ALT Linux" \
 slackware "Slackware" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
@@ -1074,11 +1939,11 @@ rm /tmp/nb-distro
 if [ $DISTRO = "ubuntu" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	resolute "Ubuntu 26.04 LTS (Subiquity)" \
+	questing "Ubuntu 25.10 (Subiquity)" \
 	noble "Ubuntu 24.04 LTS (Subiquity)" \
 	jammy "Ubuntu 22.04 LTS (Subiquity)" \
 	focal "Ubuntu 20.04 LTS" \
 	bionic "Ubuntu 18.04 LTS" \
-	xenial "Ubuntu 16.04 LTS" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	if [ "$VERSION" = "noble" ]; then
@@ -1091,6 +1956,11 @@ if [ $DISTRO = "ubuntu" ];then
 			"https://releases.ubuntu.com/resolute/netboot/amd64/linux" \
 			"https://releases.ubuntu.com/resolute/netboot/amd64/initrd" \
 			"https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso" || return
+	elif [ "$VERSION" = "questing" ]; then
+		ubuntu_live_server \
+			"https://releases.ubuntu.com/questing/netboot/amd64/linux" \
+			"https://releases.ubuntu.com/questing/netboot/amd64/initrd" \
+			"https://releases.ubuntu.com/questing/ubuntu-25.10-live-server-amd64.iso" || return
 	elif [ "$VERSION" = "jammy" ]; then
 		# Canonical no longer publishes the old jammy debian-installer
 		# netboot images.  Use netboot.xyz's ISO-extracted live-server
@@ -1121,7 +1991,8 @@ if [ $DISTRO = "ubuntu" ];then
 	fi
 fi
 if [ $DISTRO = "ubuntuflavor" ];then
-	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor to boot:" 20 75 13 \
+	UBUNTU_LIVE_CUSTOM=
+	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 22 75 13 \
 	kubuntu-26.04 "Kubuntu 26.04 LTS" \
 	xubuntu-26.04 "Xubuntu 26.04 LTS" \
 	lubuntu-26.04 "Lubuntu 26.04 LTS" \
@@ -1131,7 +2002,10 @@ if [ $DISTRO = "ubuntuflavor" ];then
 	unity-26.04 "Ubuntu Unity 26.04 LTS" \
 	edubuntu-26.04 "Edubuntu 26.04 LTS" \
 	mate-24.04 "Ubuntu MATE 24.04.4 LTS" \
-	Manual "Manually enter an Ubuntu flavor ISO URL" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	funos-24.04 "FunOS 24.04.4 LTS Calamares" \
+	linuxlite-7.8 "Linux Lite 7.8" \
+	rhino-2025.4 "Rhino Linux 2025.4" \
+	Manual "Manually enter an Ubuntu live ISO URL" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
 	UBUNTU_KERNEL_SERIES="resolute"
@@ -1154,6 +2028,29 @@ if [ $DISTRO = "ubuntuflavor" ];then
 	elif [ "$VERSION" = "mate-24.04" ]; then
 		UBUNTU_KERNEL_SERIES="noble"
 		ISODEFAULT="https://cdimage.ubuntu.com/ubuntu-mate/releases/24.04/release/ubuntu-mate-24.04.4-desktop-amd64.iso"
+	elif [ "$VERSION" = "funos-24.04" ]; then
+		ubuntu_casper_iso_setup \
+			"FunOS 24.04.4 LTS Calamares" \
+			"http://downloads.sourceforge.net/project/funos/noble/final/24.04.4/funos-24.04.4-stable.20260407-calamares.iso" \
+			"username=funos hostname=funos" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "linuxlite-7.8" ]; then
+		ubuntu_casper_iso_setup \
+			"Linux Lite 7.8" \
+			"http://master.dl.sourceforge.net/project/linux-lite/7.8/linux-lite-7.8-64bit.iso?viasf=1" \
+			"username=linuxlite hostname=linuxlite" \
+			"http://downloads.sourceforge.net/project/linux-lite/7.8/linux-lite-7.8-64bit.iso" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "rhino-2025.4" ]; then
+		ubuntu_casper_iso_setup \
+			"Rhino Linux 2025.4" \
+			"http://downloads.sourceforge.net/project/rhino-linux-builder/2025.4/Rhino-Linux-2025.4-amd64.iso?use_mirror=netactuate" \
+			"username=rhino hostname=rhino" \
+			"http://netactuate.dl.sourceforge.net/project/rhino-linux-builder/2025.4/Rhino-Linux-2025.4-amd64.iso" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
 	else
 		ISODEFAULT=
 	fi
@@ -1168,20 +2065,19 @@ if [ $DISTRO = "ubuntuflavor" ];then
 			"No Ubuntu flavor ISO URL was selected." 6 50 || true
 		return 1
 	fi
-	ubuntu_live_iso \
-		"https://releases.ubuntu.com/$UBUNTU_KERNEL_SERIES/netboot/amd64/linux" \
-		"https://releases.ubuntu.com/$UBUNTU_KERNEL_SERIES/netboot/amd64/initrd" \
-		"$ISODEFAULT" \
-		"Ubuntu flavor live ISO" || return
+	if [ "$UBUNTU_LIVE_CUSTOM" != "1" ]; then
+		ubuntu_live_iso \
+			"https://releases.ubuntu.com/$UBUNTU_KERNEL_SERIES/netboot/amd64/linux" \
+			"https://releases.ubuntu.com/$UBUNTU_KERNEL_SERIES/netboot/amd64/initrd" \
+			"$ISODEFAULT" \
+			"Ubuntu live ISO" || return
+	fi
 fi
 if [ $DISTRO = "debian" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	trixie "Debian 13" \
 	bookworm "Debian 12" \
 	bullseye "Debian 11" \
-	buster "Debian 10" \
-	stretch "Debian 9" \
-	jessie "Debian 8" \
 	stable "Debian stable" \
 	testing "Debian testing" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
@@ -1214,6 +2110,26 @@ if [ $DISTRO = "devuan" ];then
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
 fi
 
+if [ $DISTRO = "debianlive" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 16 \
+	butterbian-xfce "Butterbian Xfce 0.2.1" \
+	butterknife "Butterknife 0.1.11" \
+	bunsenlabs-carbon "BunsenLabs Carbon 1" \
+	emmabuntus-de6-core "Emmabuntus DE6 Core" \
+	locos-24 "Loc-OS 24" \
+	mauna-christian "Mauna Linux 25.2 Christian Edition" \
+	minios-standard "MiniOS 5.1.1 Standard" \
+	nakedeb-16 "nakeDeb 1.6" \
+	neptune-91 "Neptune 9.1" \
+	refracta-xfce "Refracta 13.3 Xfce" \
+	refracta-nox "Refracta 13.3 noX" \
+	solydx-13 "SolydX 13" \
+	wattos-r13 "wattOS R13" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	debian_live_iso_setup "$VERSION" || return
+fi
+
 if [ $DISTRO = "q4os" ];then
 	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6.6-5d30850e"
 	KERNELURL="$BASE/vmlinuz"
@@ -1237,7 +2153,6 @@ if [ $DISTRO = "opensuse" ];then
 	tumbleweed "openSUSE Tumbleweed" \
 	slowroll "openSUSE Slowroll" \
 	leap/16.0 "openSUSE Leap 16.0" \
-	leap/15.6 "openSUSE Leap 15.6" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	if [ $VERSION != "tumbleweed" ] && [ $VERSION != "slowroll" ];then
@@ -1252,7 +2167,7 @@ if [ $DISTRO = "opensuse" ];then
 fi
 if [ $DISTRO = "mageia" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	10 "Mageia 10" \
+	10 "Mageia 10 pre-release" \
 	9 "Mageia 9" \
 	cauldron "Mageia cauldron" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
@@ -1312,16 +2227,13 @@ fi
 if [ $DISTRO = "rhel-type-8" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	a_8 "Latest version of AlmaLinux 8" \
-	c_8 "Latest version of CentOS 8" \
 	r_8 "Latest version of Rocky Linux 8" \
-	Manual "Manually enter a version to install (prefix with a_, c_, or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	Manual "Manually enter a version to install (prefix with a_ or r_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
 	if [ $TYPE = a ];then
 		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	elif [ $TYPE = c ];then
-		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	elif [ $TYPE = r ];then
 		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
@@ -1331,44 +2243,6 @@ if [ $DISTRO = "rhel-type-8" ];then
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
 	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
-	rm /tmp/nb-server
-fi
-if [ $DISTRO = "rhel-type-7" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	c_7 "Latest version of CentOS 7" \
-	s_7x "Latest version of Scientific Linux 7" \
-	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	TYPE=$(echo $VERSION|head -c 1)
-	VERSION=$(echo $VERSION|tail -c +3)
-	if [ $TYPE = s ];then
-		dialog --inputbox "Where do you want to install Scientific Linux from?" 8 70 "ftp://linux1.fnal.gov/linux/scientific/$VERSION/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	else
-		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/os/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	fi
-	SERVER=$(cat /tmp/nb-server)
-	KERNELURL="$SERVER/isolinux/vmlinuz"
-	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "xdriver=vesa nomodeset repo=$SERVER" >>/tmp/nb-options
-	rm /tmp/nb-server
-fi
-if [ $DISTRO = "rhel-type-6" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	c_6 "Latest version of CentOS 6" \
-	s_6x "Latest version of Scientific Linux 6" \
-	Manual "Manually enter a version to install (prefix with s_ or c_)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	TYPE=$(echo $VERSION|head -c 1)
-	VERSION=$(echo $VERSION|tail -c +3)
-	if [ $TYPE = s ];then
-		dialog --inputbox "Where do you want to install Scientific Linux from?" 8 70 "ftp://linux1.fnal.gov/linux/scientific/$VERSION/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	else
-		dialog --inputbox "Where do you want to install CentOS from?" 8 70 "http://mirrors.kernel.org/centos/$VERSION/os/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	fi
-	SERVER=$(cat /tmp/nb-server)
-	KERNELURL="$SERVER/isolinux/vmlinuz"
-	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "ide=nodma method=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ $DISTRO = "cloudlinux" ];then
@@ -1393,10 +2267,8 @@ if [ $DISTRO = "rhel-extra" ];then
 	eurolinux-8.10 "EuroLinux 8.10" \
 	springdale-9.2 "Springdale Linux 9.2" \
 	springdale-8.8 "Springdale Linux 8.8" \
-	clearos-7 "ClearOS 7.9" \
 	smeserver-11.0-beta1 "Koozali SME Server 11.0 Beta 1" \
-	smeserver-10.1 "Koozali SME Server 10.1" \
-	tencentos-4.6 "TencentOS Server 4.6" \
+	tencentos-4 "TencentOS Server 4 latest" \
 	tencentos-3.3 "TencentOS Server 3.3" \
 	custom "Custom RHEL-compatible installer tree" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
@@ -1425,18 +2297,12 @@ if [ $DISTRO = "rhel-extra" ];then
 	elif [ "$VERSION" = "springdale-8.8" ];then
 		DISTNAME="Springdale Linux"
 		SERVERDEFAULT="http://springdale.princeton.edu/data/puias/8.8/x86_64/os"
-	elif [ "$VERSION" = "clearos-7" ];then
-		DISTNAME="ClearOS"
-		SERVERDEFAULT="https://mirror.math.princeton.edu/pub/clearos/7.9.1.342252/os/x86_64"
 	elif [ "$VERSION" = "smeserver-11.0-beta1" ];then
 		DISTNAME="Koozali SME Server"
 		SERVERDEFAULT="https://distro.ibiblio.org/smeserver/releases/testing/11/smeos/x86_64"
-	elif [ "$VERSION" = "smeserver-10.1" ];then
-		DISTNAME="Koozali SME Server"
-		SERVERDEFAULT="https://distro.ibiblio.org/smeserver/releases/10.1/smeos/x86_64"
-	elif [ "$VERSION" = "tencentos-4.6" ];then
+	elif [ "$VERSION" = "tencentos-4" ];then
 		DISTNAME="TencentOS Server"
-		SERVERDEFAULT="https://mirrors.tencent.com/tlinux/4.6/BaseOS/x86_64/os"
+		SERVERDEFAULT="https://mirrors.tencent.com/tlinux/4/BaseOS/x86_64/os"
 	elif [ "$VERSION" = "tencentos-3.3" ];then
 		DISTNAME="TencentOS Server"
 		SERVERDEFAULT="https://mirrors.tencent.com/tlinux/3.3/BaseOS/x86_64/os"
@@ -1454,11 +2320,9 @@ if [ $DISTRO = "rhel-extra" ];then
 	fi
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
-	if [ "$VERSION" = "smeserver-10.1" ];then
-		echo -n "ip=dhcp initcall_blacklist=clocksource_done_booting inst.stage2=$SERVER inst.ks=$SERVER/Packages/base/sme-kickstart.cfg quiet" >>/tmp/nb-options
-	elif [ "$VERSION" = "smeserver-11.0-beta1" ];then
+	if [ "$VERSION" = "smeserver-11.0-beta1" ];then
 		echo -n "ip=dhcp initcall_blacklist=clocksource_done_booting inst.stage2=$SERVER inst.repo=$SERVER quiet" >>/tmp/nb-options
-	elif [ "$VERSION" = "tencentos-4.6" ] || [ "$VERSION" = "tencentos-3.3" ];then
+	elif [ "$VERSION" = "tencentos-4" ] || [ "$VERSION" = "tencentos-3.3" ];then
 		echo -n "ip=dhcp nomodeset inst.stage2=$SERVER inst.repo=$SERVER inst.noverifyssl" >>/tmp/nb-options
 	else
 		echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
@@ -1468,10 +2332,8 @@ fi
 if [ $DISTRO = "openeuler" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	24.03-LTS-SP3 "openEuler 24.03 LTS SP3" \
-	24.03-LTS-SP2 "openEuler 24.03 LTS SP2" \
 	24.03-LTS-SP1 "openEuler 24.03 LTS SP1" \
 	24.03-LTS "openEuler 24.03 LTS" \
-	25.03 "openEuler 25.03" \
 	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
 	Manual "Manually enter a version to install (e.g. 24.03-LTS)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
@@ -1508,6 +2370,23 @@ if [ $DISTRO = "artix" ];then
 	rm /tmp/nb-version
 	artix_iso_setup "$VERSION" || return
 fi
+if [ $DISTRO = "void" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a Void Linux live system to boot:" 14 76 6 \
+	glibc-base "Base (glibc)" \
+	glibc-xfce "Xfce (glibc)" \
+	musl-base "Base (musl)" \
+	musl-xfce "Xfce (musl)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	void_iso_setup "$VERSION" || return
+fi
+if [ $DISTRO = "altlinux" ];then
+	dialog --backtitle "$TITLE" --menu "Choose an ALT Linux system to boot:" 10 76 2 \
+	regular-jeos-systemd "Sisyphus regular JeOS systemd installer (latest)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	altlinux_iso_setup "$VERSION" || return
+fi
 if [ $DISTRO = "slackware" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	slackware64-current "Slackware64-current" \
@@ -1531,8 +2410,8 @@ if [ $DISTRO = "rescue" ];then
 	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
 	rescuezilla       "Rescuezilla 2.6.1" \
 	4mlinux           "4MLinux 51.0" \
-	grml-full         "Grml Full 2025.12" \
-	grml-small        "Grml Small 2025.12" 2>/tmp/nb-rescue || { rm -f /tmp/nb-rescue; return; }
+	grml-full         "Grml Full 2026.04" \
+	grml-small        "Grml Small 2026.04" 2>/tmp/nb-rescue || { rm -f /tmp/nb-rescue; return; }
 	DISTRO=$(cat /tmp/nb-rescue)
 	rm /tmp/nb-rescue
 	if [ $DISTRO = "gparted" ];then
@@ -1562,14 +2441,14 @@ if [ $DISTRO = "rescue" ];then
 		INITRDURL="$BASE/initrd"
 	fi
 	if [ $DISTRO = "grml-full" ];then
-		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2025.12-ee78df85"
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.04-23b18cd7"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
 	fi
 	if [ $DISTRO = "grml-small" ];then
-		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2025.12-ca5dc013"
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.04-410a8803"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
@@ -1581,6 +2460,21 @@ askforopts
 if [ -n "${ARTIX_ISO_URL:-}" ]; then
 	if ! artix_prepare_from_iso "$ARTIX_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.* /tmp/nb-artix-overlay.cpio
+		return 1
+	fi
+elif [ -n "${VOID_ISO_URL:-}" ]; then
+	if ! void_prepare_from_iso "$VOID_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-void.iso
+		return 1
+	fi
+elif [ -n "${ALTLINUX_ISO_URL:-}" ]; then
+	if ! altlinux_prepare_from_iso "$ALTLINUX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-altlinux.iso
+		return 1
+	fi
+elif [ -n "${DEBIAN_LIVE_ISO_URL:-}" ]; then
+	if ! debian_live_prepare_from_iso "$DEBIAN_LIVE_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-debian-live.iso
 		return 1
 	fi
 else
