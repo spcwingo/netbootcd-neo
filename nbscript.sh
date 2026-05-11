@@ -1764,7 +1764,7 @@ wifimenu ()
 		done < /tmp/nb-ssidlist
 		set -- "$@" "manual" "Enter SSID manually"
 		dialog --backtitle "$TITLE" --menu \
-			"Select a wireless network (use arrow keys):" 20 70 13 \
+			"Select a wireless network:" 20 70 13 \
 			"$@" 2>/tmp/nb-wifisel || { rm -f /tmp/nb-wifisel /tmp/nb-ssidlist /tmp/nb-wifiscan; return; }
 		WIFI_SEL=$(cat /tmp/nb-wifisel)
 		rm -f /tmp/nb-wifisel
