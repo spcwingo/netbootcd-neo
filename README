@@ -10,4 +10,4 @@ To build run as root:
 
 cd ~/Downloads/netbootcd-neo && ./Build.sh
 
-Of course that's assuming the extracted folder is in your Downloads directory. Adjust as necessary.
+Of course that's assuming the extracted folder is in your Downloads directory. Adjust as necessary. The resulting ISOs are hybrid so they may be written to optical discs or USB drives.
