@@ -160,6 +160,14 @@ community_live_iso_setup ()
 				"https://downloads.getsol.us/isos/2026-04-18/Solus-Xfce-Release-2026-04-18.iso" \
 				"quiet splash" || return
 			;;
+		mocaccino-kde-20260505)
+			mocaccino_live_iso_setup \
+				"MocaccinoOS KDE 0.20260505" \
+				"http://downloads.sourceforge.net/project/mocaccino/v26.05/MocaccinoOS-KDE-0.20260505.iso" \
+				"boot/kernel.xz" \
+				"boot/rootfs.xz" \
+				"rootfs.squashfs" || return
+			;;
 		*)
 			nb_error "Unknown community live ISO entry: $_community_live_tag"
 			return 1
@@ -230,6 +238,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="BunsenLabs Carbon 1"
 			DEBIAN_LIVE_ISO_URL="http://ddl.bunsenlabs.org/ddl/carbon-1-260211-amd64.hybrid.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=bunsenlabs"
+			;;
+		besgnulinux-jwm)
+			DEBIAN_LIVE_LABEL="Besgnulinux JWM 3.3"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/besgnulinux/besgnulinux-jwm-3-3.iso"
+			DEBIAN_LIVE_OPTIONS="username=besgnulinux hostname=besgnulinux"
 			;;
 		emmabuntus-de6-core)
 			DEBIAN_LIVE_LABEL="Emmabuntus DE6 Core"
@@ -1003,6 +1016,503 @@ pika_prepare_from_iso ()
 	fi
 
 	rm -f "$_pika_boot_image" /tmp/nb-pika-7z.log /tmp/nb-pika-mount.log
+	return 0
+}
+
+archiso_live_iso_setup ()
+{
+	ARCHISO_LABEL="$1"
+	ARCHISO_ISO_URL="$2"
+	ARCHISO_KERNEL_PATH="$3"
+	ARCHISO_INITRD_PATH="$4"
+	ARCHISO_ROOTFS_PATH="$5"
+	ARCHISO_CHECKSUM_PATH="$6"
+	echo -n "$7 " >>/tmp/nb-options
+}
+
+archiso_repack_initrd_with_rootfs ()
+{
+	_archiso_rootfs="$1"
+	_archiso_checksum="$2"
+	_archiso_work="/tmp/nb-archiso-initrd-work"
+	_archiso_repacked="/tmp/nb-initrd.archiso"
+
+	if ! _archiso_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $ARCHISO_LABEL initramfs compression format."
+		return 1
+	fi
+	_archiso_format="${_archiso_main_info%% *}"
+	_archiso_main_offset="${_archiso_main_info#* }"
+
+	if [ "$_archiso_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$ARCHISO_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_archiso_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$ARCHISO_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_archiso_work" "$_archiso_repacked" /tmp/nb-initrd.new
+	mkdir -p "$_archiso_work"
+
+	case "$_archiso_format" in
+		gzip)
+			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_archiso_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $ARCHISO_LABEL gzip initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_archiso_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $ARCHISO_LABEL zstd initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_archiso_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $ARCHISO_LABEL xz initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_archiso_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $ARCHISO_LABEL cpio initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+	esac
+
+	_archiso_rootfs_dest="$_archiso_work/$ARCHISO_ROOTFS_PATH"
+	_archiso_rootfs_dir="${_archiso_rootfs_dest%/*}"
+	mkdir -p "$_archiso_rootfs_dir" "$_archiso_work/hooks"
+	if ! mv "$_archiso_rootfs" "$_archiso_rootfs_dest"; then
+		nb_error "Could not embed the $ARCHISO_LABEL root filesystem."
+		rm -rf "$_archiso_work"
+		return 1
+	fi
+	if [ -n "$_archiso_checksum" ] && [ -f "$_archiso_checksum" ]; then
+		mv "$_archiso_checksum" "$_archiso_rootfs_dir/${ARCHISO_CHECKSUM_PATH##*/}" || true
+	fi
+
+	cat >"$_archiso_work/hooks/netbootcd_archiso" <<'EOFA'
+#!/usr/bin/ash
+
+run_hook() {
+    if [ -f "/${archisobasedir}/${arch}/airootfs.sfs" ] || [ -f "/${archisobasedir}/${arch}/airootfs.erofs" ]; then
+        copytoram=n
+        export mount_handler="netbootcd_archiso_mount_handler"
+    fi
+}
+
+netbootcd_archiso_mount_handler() {
+    newroot="${1}"
+
+    msg ":: Using NetbootCD embedded archiso root filesystem"
+    mkdir -p /run/archiso/bootmnt
+    if ! mountpoint -q /run/archiso/bootmnt; then
+        mount --bind / /run/archiso/bootmnt || {
+            echo "ERROR: could not bind initramfs for embedded archiso root"
+            launch_interactive_shell
+        }
+    fi
+
+    archisodevice=/
+    copytoram=n
+    archiso_mount_handler "$newroot"
+}
+EOFA
+	chmod 755 "$_archiso_work/hooks/netbootcd_archiso"
+
+	if [ -f "$_archiso_work/config" ] && ! grep -q 'netbootcd_archiso' "$_archiso_work/config"; then
+		if grep -q '^HOOKS="' "$_archiso_work/config"; then
+			if ! sed 's/^HOOKS="\([^"]*\)"/HOOKS="\1 netbootcd_archiso"/' "$_archiso_work/config" >"$_archiso_work/config.new"; then
+				nb_error "Could not update the $ARCHISO_LABEL initramfs hook list."
+				rm -rf "$_archiso_work" "$_archiso_repacked" "$_archiso_work/config.new"
+				return 1
+			fi
+			mv "$_archiso_work/config.new" "$_archiso_work/config"
+		else
+			printf '\nHOOKS="${HOOKS} netbootcd_archiso"\n' >>"$_archiso_work/config"
+		fi
+	fi
+
+	case "$_archiso_format" in
+		gzip)
+			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc | gzip -1 -c >"$_archiso_repacked" ); then
+				nb_error "Could not repack the $ARCHISO_LABEL gzip initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc | zstd -q -c >"$_archiso_repacked" ); then
+				nb_error "Could not repack the $ARCHISO_LABEL zstd initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_archiso_repacked" ); then
+				nb_error "Could not repack the $ARCHISO_LABEL xz initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc >"$_archiso_repacked" ); then
+				nb_error "Could not repack the $ARCHISO_LABEL cpio initramfs."
+				rm -rf "$_archiso_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_archiso_main_offset" -gt 0 ]; then
+		if ! head -c "$_archiso_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $ARCHISO_LABEL early initramfs prefix."
+			rm -rf "$_archiso_work" "$_archiso_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_archiso_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $ARCHISO_LABEL initramfs."
+		rm -rf "$_archiso_work" "$_archiso_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_archiso_work" "$_archiso_repacked"
+	return 0
+}
+
+archiso_prepare_from_iso ()
+{
+	_archiso_iso_url="$1"
+	_archiso_work="/tmp/nb-archiso-work"
+	_archiso_iso="$_archiso_work/nb-archiso.iso"
+	_archiso_boot="$_archiso_work/boot"
+	_archiso_rootfs="$_archiso_work/airootfs.sfs"
+	_archiso_checksum="$_archiso_work/airootfs.sha512"
+
+	if ! _archiso_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $ARCHISO_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_archiso_work " /proc/mounts 2>/dev/null; then
+		umount "$_archiso_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_archiso_work" /tmp/nb-archiso-initrd-work /tmp/nb-initrd.archiso /tmp/nb-initrd.new
+	mkdir -p "$_archiso_boot"
+	_archiso_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_archiso_work" 2>/tmp/nb-archiso-mount.log; then
+		_archiso_mounted=1
+		mkdir -p "$_archiso_boot"
+	fi
+
+	if ! wgetgauge "$_archiso_iso_url" "$_archiso_iso" "Downloading $ARCHISO_LABEL ISO"; then
+		nb_error "Could not download $ARCHISO_LABEL ISO from:\n\n$_archiso_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+		rm -rf "$_archiso_work"
+		return 1
+	fi
+
+	if ! "$_archiso_7z" e -y -o"$_archiso_boot" "$_archiso_iso" "$ARCHISO_KERNEL_PATH" "$ARCHISO_INITRD_PATH" >/tmp/nb-archiso-7z.log 2>&1; then
+		nb_error "Could not extract $ARCHISO_LABEL boot files from the ISO.\nSee /tmp/nb-archiso-7z.log for details."
+		[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+		rm -rf "$_archiso_work"
+		return 1
+	fi
+	_archiso_kernel_file="${ARCHISO_KERNEL_PATH##*/}"
+	_archiso_initrd_file="${ARCHISO_INITRD_PATH##*/}"
+	if [ ! -s "$_archiso_boot/$_archiso_kernel_file" ] || [ ! -s "$_archiso_boot/$_archiso_initrd_file" ]; then
+		nb_error "The $ARCHISO_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+		rm -rf "$_archiso_work"
+		return 1
+	fi
+	mv "$_archiso_boot/$_archiso_kernel_file" /tmp/nb-linux
+	mv "$_archiso_boot/$_archiso_initrd_file" /tmp/nb-initrd
+	rm -rf "$_archiso_boot"
+
+	if ! "$_archiso_7z" e -y -o"$_archiso_work" "$_archiso_iso" "$ARCHISO_ROOTFS_PATH" >>/tmp/nb-archiso-7z.log 2>&1; then
+		nb_error "Could not extract $ARCHISO_LABEL root filesystem from the ISO.\nSee /tmp/nb-archiso-7z.log for details."
+		[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+		rm -rf "$_archiso_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	_archiso_rootfs_file="${ARCHISO_ROOTFS_PATH##*/}"
+	if [ ! -s "$_archiso_work/$_archiso_rootfs_file" ]; then
+		nb_error "The $ARCHISO_LABEL ISO did not contain $ARCHISO_ROOTFS_PATH."
+		[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+		rm -rf "$_archiso_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	mv "$_archiso_work/$_archiso_rootfs_file" "$_archiso_rootfs"
+
+	if [ -n "$ARCHISO_CHECKSUM_PATH" ]; then
+		"$_archiso_7z" e -y -o"$_archiso_work" "$_archiso_iso" "$ARCHISO_CHECKSUM_PATH" >>/tmp/nb-archiso-7z.log 2>&1 || true
+		_archiso_checksum_file="${ARCHISO_CHECKSUM_PATH##*/}"
+		[ -s "$_archiso_work/$_archiso_checksum_file" ] && mv "$_archiso_work/$_archiso_checksum_file" "$_archiso_checksum"
+	fi
+	rm -f "$_archiso_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $ARCHISO_LABEL root filesystem into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! archiso_repack_initrd_with_rootfs "$_archiso_rootfs" "$_archiso_checksum"; then
+		[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+		rm -rf "$_archiso_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.archiso
+		return 1
+	fi
+
+	rm -f "$_archiso_iso" "$_archiso_rootfs" "$_archiso_checksum" /tmp/nb-archiso-7z.log /tmp/nb-archiso-mount.log
+	[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
+	rm -rf "$_archiso_work"
+	return 0
+}
+
+mocaccino_live_iso_setup ()
+{
+	MOCACCINO_LABEL="$1"
+	MOCACCINO_ISO_URL="$2"
+	MOCACCINO_KERNEL_PATH="$3"
+	MOCACCINO_INITRD_PATH="$4"
+	MOCACCINO_ROOTFS_PATH="$5"
+	echo -n "netbootcd_mocaccino=1 rootdelay=7 " >>/tmp/nb-options
+}
+
+mocaccino_repack_initrd_with_rootfs ()
+{
+	_mocaccino_rootfs="$1"
+	_mocaccino_work="/tmp/nb-mocaccino-initrd-work"
+	_mocaccino_repacked="/tmp/nb-initrd.mocaccino"
+
+	if ! _mocaccino_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $MOCACCINO_LABEL initramfs compression format."
+		return 1
+	fi
+	_mocaccino_format="${_mocaccino_main_info%% *}"
+	_mocaccino_main_offset="${_mocaccino_main_info#* }"
+
+	if [ "$_mocaccino_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$MOCACCINO_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_mocaccino_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$MOCACCINO_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_mocaccino_work" "$_mocaccino_repacked" /tmp/nb-initrd.new
+	mkdir -p "$_mocaccino_work"
+
+	case "$_mocaccino_format" in
+		gzip)
+			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $MOCACCINO_LABEL gzip initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $MOCACCINO_LABEL zstd initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $MOCACCINO_LABEL xz initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $MOCACCINO_LABEL cpio initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+	esac
+
+	if ! mv "$_mocaccino_rootfs" "$_mocaccino_work/rootfs.squashfs"; then
+		nb_error "Could not embed the $MOCACCINO_LABEL root filesystem."
+		rm -rf "$_mocaccino_work"
+		return 1
+	fi
+	if [ -f "$_mocaccino_work/loader" ] && ! grep -q 'netbootcd_mocaccino_embedded_overlay' "$_mocaccino_work/loader"; then
+		if ! sed '/^search_overlay() {/a\
+  # netbootcd_mocaccino_embedded_overlay\
+  if [ -f /rootfs.squashfs ] ; then\
+    echo "Using embedded NetbootCD-Neo MocaccinoOS rootfs.squashfs."\
+    mkdir -p /tmp/mnt/image\
+    IMAGE_MNT=/tmp/mnt/image\
+    LOOP_DEVICE=$(losetup -f)\
+    losetup $LOOP_DEVICE /rootfs.squashfs\
+    if mount $LOOP_DEVICE $IMAGE_MNT -t squashfs ; then\
+      OVERLAY_DIR=$IMAGE_MNT\
+      UPPER_DIR=$DEFAULT_UPPER_DIR\
+      WORK_DIR=$DEFAULT_WORK_DIR\
+      mkdir -p $UPPER_DIR $WORK_DIR\
+      if mount -t overlay -o lowerdir=$OVERLAY_DIR:/mnt,upperdir=$UPPER_DIR,workdir=$WORK_DIR none /mnt ; then\
+        echo "Embedded NetbootCD-Neo rootfs.squashfs has been merged."\
+        return\
+      fi\
+      echo "Embedded NetbootCD-Neo overlay mount failed."\
+      umount $IMAGE_MNT 2>/dev/null\
+    else\
+      echo "Embedded NetbootCD-Neo squashfs mount failed."\
+    fi\
+  fi\
+' "$_mocaccino_work/loader" >"$_mocaccino_work/loader.new"; then
+			nb_error "Could not patch the $MOCACCINO_LABEL live loader."
+			rm -rf "$_mocaccino_work" "$_mocaccino_work/loader.new"
+			return 1
+		fi
+		mv "$_mocaccino_work/loader.new" "$_mocaccino_work/loader"
+		chmod 755 "$_mocaccino_work/loader"
+	fi
+
+	case "$_mocaccino_format" in
+		gzip)
+			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc | gzip -1 -c >"$_mocaccino_repacked" ); then
+				nb_error "Could not repack the $MOCACCINO_LABEL gzip initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc | zstd -q -c >"$_mocaccino_repacked" ); then
+				nb_error "Could not repack the $MOCACCINO_LABEL zstd initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_mocaccino_repacked" ); then
+				nb_error "Could not repack the $MOCACCINO_LABEL xz initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc >"$_mocaccino_repacked" ); then
+				nb_error "Could not repack the $MOCACCINO_LABEL cpio initramfs."
+				rm -rf "$_mocaccino_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_mocaccino_main_offset" -gt 0 ]; then
+		if ! head -c "$_mocaccino_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $MOCACCINO_LABEL early initramfs prefix."
+			rm -rf "$_mocaccino_work" "$_mocaccino_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_mocaccino_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $MOCACCINO_LABEL initramfs."
+		rm -rf "$_mocaccino_work" "$_mocaccino_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_mocaccino_work" "$_mocaccino_repacked"
+	return 0
+}
+
+mocaccino_prepare_from_iso ()
+{
+	_mocaccino_iso_url="$1"
+	_mocaccino_work="/tmp/nb-mocaccino-work"
+	_mocaccino_iso="$_mocaccino_work/nb-mocaccino.iso"
+	_mocaccino_boot="$_mocaccino_work/boot"
+	_mocaccino_rootfs="$_mocaccino_work/rootfs.squashfs"
+
+	if ! _mocaccino_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $MOCACCINO_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_mocaccino_work " /proc/mounts 2>/dev/null; then
+		umount "$_mocaccino_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_mocaccino_work" /tmp/nb-mocaccino-initrd-work /tmp/nb-initrd.mocaccino /tmp/nb-initrd.new
+	mkdir -p "$_mocaccino_boot"
+	_mocaccino_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_mocaccino_work" 2>/tmp/nb-mocaccino-mount.log; then
+		_mocaccino_mounted=1
+		mkdir -p "$_mocaccino_boot"
+	fi
+
+	if ! wgetgauge "$_mocaccino_iso_url" "$_mocaccino_iso" "Downloading $MOCACCINO_LABEL ISO"; then
+		nb_error "Could not download $MOCACCINO_LABEL ISO from:\n\n$_mocaccino_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+		rm -rf "$_mocaccino_work"
+		return 1
+	fi
+
+	if ! "$_mocaccino_7z" e -y -o"$_mocaccino_boot" "$_mocaccino_iso" "$MOCACCINO_KERNEL_PATH" "$MOCACCINO_INITRD_PATH" >/tmp/nb-mocaccino-7z.log 2>&1; then
+		nb_error "Could not extract $MOCACCINO_LABEL boot files from the ISO.\nSee /tmp/nb-mocaccino-7z.log for details."
+		[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+		rm -rf "$_mocaccino_work"
+		return 1
+	fi
+	_mocaccino_kernel_file="${MOCACCINO_KERNEL_PATH##*/}"
+	_mocaccino_initrd_file="${MOCACCINO_INITRD_PATH##*/}"
+	if [ ! -s "$_mocaccino_boot/$_mocaccino_kernel_file" ] || [ ! -s "$_mocaccino_boot/$_mocaccino_initrd_file" ]; then
+		nb_error "The $MOCACCINO_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+		rm -rf "$_mocaccino_work"
+		return 1
+	fi
+	mv "$_mocaccino_boot/$_mocaccino_kernel_file" /tmp/nb-linux
+	mv "$_mocaccino_boot/$_mocaccino_initrd_file" /tmp/nb-initrd
+	rm -rf "$_mocaccino_boot"
+
+	if ! "$_mocaccino_7z" e -y -o"$_mocaccino_work" "$_mocaccino_iso" "$MOCACCINO_ROOTFS_PATH" >>/tmp/nb-mocaccino-7z.log 2>&1; then
+		nb_error "Could not extract $MOCACCINO_LABEL root filesystem from the ISO.\nSee /tmp/nb-mocaccino-7z.log for details."
+		[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+		rm -rf "$_mocaccino_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	_mocaccino_rootfs_file="${MOCACCINO_ROOTFS_PATH##*/}"
+	if [ ! -s "$_mocaccino_work/$_mocaccino_rootfs_file" ]; then
+		nb_error "The $MOCACCINO_LABEL ISO did not contain $MOCACCINO_ROOTFS_PATH."
+		[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+		rm -rf "$_mocaccino_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	mv "$_mocaccino_work/$_mocaccino_rootfs_file" "$_mocaccino_rootfs"
+	rm -f "$_mocaccino_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $MOCACCINO_LABEL root filesystem into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! mocaccino_repack_initrd_with_rootfs "$_mocaccino_rootfs"; then
+		[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+		rm -rf "$_mocaccino_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.mocaccino
+		return 1
+	fi
+
+	rm -f "$_mocaccino_iso" "$_mocaccino_rootfs" /tmp/nb-mocaccino-7z.log /tmp/nb-mocaccino-mount.log
+	[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
+	rm -rf "$_mocaccino_work"
 	return 0
 }
 
@@ -3028,6 +3538,17 @@ PIKA_ISO_URL=
 PIKA_LABEL=
 PIKA_ISO_FILE=
 PIKA_ISO_VOLUME=
+ARCHISO_ISO_URL=
+ARCHISO_LABEL=
+ARCHISO_KERNEL_PATH=
+ARCHISO_INITRD_PATH=
+ARCHISO_ROOTFS_PATH=
+ARCHISO_CHECKSUM_PATH=
+MOCACCINO_ISO_URL=
+MOCACCINO_LABEL=
+MOCACCINO_KERNEL_PATH=
+MOCACCINO_INITRD_PATH=
+MOCACCINO_ROOTFS_PATH=
 ISO_BOOT_URL=
 ISO_BOOT_LABEL=
 ISO_BOOT_KERNEL_PATH=
@@ -3262,7 +3783,8 @@ if [ $DISTRO = "devuan" ];then
 fi
 
 if [ $DISTRO = "debianlive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 18 \
+	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 19 \
+	besgnulinux-jwm "Besgnulinux JWM 3.3" \
 	butterbian-xfce "Butterbian Xfce 0.2.1" \
 	butterknife "Butterknife 0.1.11" \
 	bunsenlabs-carbon "BunsenLabs Carbon 1" \
@@ -3297,6 +3819,7 @@ fi
 
 if [ "$DISTRO" = "communitylive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 22 78 12 \
+	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
@@ -3669,6 +4192,16 @@ elif [ -n "${ALTLINUX_ISO_URL:-}" ]; then
 elif [ -n "${GUIX_ISO_URL:-}" ]; then
 	if ! guix_prepare_from_iso "$GUIX_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-guix.iso
+		return 1
+	fi
+elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
+	if ! archiso_prepare_from_iso "$ARCHISO_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-archiso.iso
+		return 1
+	fi
+elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
+	if ! mocaccino_prepare_from_iso "$MOCACCINO_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-mocaccino.iso
 		return 1
 	fi
 elif [ -n "${PIKA_ISO_URL:-}" ]; then
