@@ -30,13 +30,10 @@ export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
 TITLE="NetbootCD-Neo Script 17.1 - May 11, 2026"
 
-# Detect UEFI mode once at startup; used throughout the script.
 EFIMODE=0
 [ -d /sys/firmware/efi ] && EFIMODE=1
 
-# TinyCore has no CA certificate store, so HTTPS connections fail at the
-# TLS handshake unless we skip verification.  --tries=3 retries transient
-# connection resets automatically.
+# TinyCore has no CA store; retry transient TLS/download failures.
 WGET="wget --no-check-certificate --tries=3"
 NBSCRIPT_UPDATE_URL="https://raw.githubusercontent.com/spcwingo/netbootcd-neo/refs/heads/main/nbscript.sh"
 
@@ -45,7 +42,7 @@ getversion ()
 	VERSION=$(cat /tmp/nb-version)
 	if [ "$VERSION" = "Manual" ]; then
 		printf 'Version (codename for Debian/Ubuntu, number for others): '
-		read VERSION
+		read -r VERSION
 		if [ -z "$VERSION" ]; then rm -f /tmp/nb-version; return 1; fi
 	fi
 	rm /tmp/nb-version
@@ -64,7 +61,7 @@ getisourl ()
 		_rc=$?
 		[ "$_rc" -eq 1 ] || return 1
 		printf 'URL for the %s [%s]: ' "$ISOLABEL" "$ISODEFAULT"
-		read ISOURL
+		read -r ISOURL
 		ISOURL="${ISOURL:-$ISODEFAULT}"
 	fi
 
@@ -93,6 +90,81 @@ ubuntu_casper_iso_setup ()
 	DEBIAN_LIVE_KERNEL_PATHS="casper/vmlinuz casper/vmlinuz.efi live/vmlinuz boot/vmlinuz boot/vmlinuz-*"
 	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst"
 	echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
+}
+
+dracut_live_iso_setup ()
+{
+	DEBIAN_LIVE_LABEL="$1"
+	DEBIAN_LIVE_ISO_URL="$2"
+	DEBIAN_LIVE_BOOT_URL="$2"
+	DEBIAN_LIVE_MODE=embed
+	DEBIAN_LIVE_KERNEL_PATHS="images/pxeboot/vmlinuz isolinux/vmlinuz boot/kernel boot/vmlinuz boot/vmlinuz-*"
+	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img isolinux/initrd.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
+	DEBIAN_LIVE_ROOTFS_PATHS="LiveOS/squashfs.img"
+	DEBIAN_LIVE_EMBED_ROOTFS_PATH="LiveOS/squashfs.img"
+	echo -n "root=live:/LiveOS/squashfs.img ro rd.live.image rd.live.overlay.overlayfs=1 rd.luks=0 rd.md=0 rd.dm=0 $3 " >>/tmp/nb-options
+}
+
+pika_iso_setup ()
+{
+	PIKA_LABEL="$1"
+	PIKA_ISO_URL="$2"
+	PIKA_ISO_FILE="$3"
+	PIKA_ISO_VOLUME="$4"
+	echo -n "VTOY_ISO_NAME=$PIKA_ISO_FILE ISO_LABEL_NAME=\"$PIKA_ISO_VOLUME\" boot=live booster.loadcdrom booster.skiproot " >>/tmp/nb-options
+}
+
+community_live_iso_setup ()
+{
+	_community_live_tag="$1"
+
+	case "$_community_live_tag" in
+		pikaos-gnome)
+			pika_iso_setup \
+				"PikaOS GNOME 4.0" \
+				"https://iso.pika-os.com/PikaOS-Nest-GNOME-4.0-amd64-v3-26.04.04-1.iso" \
+				"PikaOS-Nest-GNOME-4.0-amd64-v3-26.04.04-1.iso" \
+				"PGN 26.04.04 1" || return
+			;;
+		pikaos-kde)
+			pika_iso_setup \
+				"PikaOS KDE 4.0" \
+				"https://iso.pika-os.com/PikaOS-Nest-KDE-4.0-amd64-v3-26.04.04-1.iso" \
+				"PikaOS-Nest-KDE-4.0-amd64-v3-26.04.04-1.iso" \
+				"PKD 26.04.04 1" || return
+			;;
+		pikaos-hyprland)
+			pika_iso_setup \
+				"PikaOS Hyprland 4.0" \
+				"https://iso.pika-os.com/PikaOS-Nest-Hyprland-4.0-amd64-v3-26.04.04-1.iso" \
+				"PikaOS-Nest-Hyprland-4.0-amd64-v3-26.04.04-1.iso" \
+				"PHL 26.04.04 1" || return
+			;;
+		pikaos-niri)
+			pika_iso_setup \
+				"PikaOS Niri 4.0" \
+				"https://iso.pika-os.com/PikaOS-Nest-Niri-4.0-amd64-v3-26.04.04-1.iso" \
+				"PikaOS-Nest-Niri-4.0-amd64-v3-26.04.04-1.iso" \
+				"PNI 26.04.04 1" || return
+			;;
+		pikaos-cosmic)
+			pika_iso_setup \
+				"PikaOS COSMIC 4.0" \
+				"https://iso.pika-os.com/PikaOS-Nest-COSMIC-4.0-amd64-v3-26.04.04-1.iso" \
+				"PikaOS-Nest-COSMIC-4.0-amd64-v3-26.04.04-1.iso" \
+				"PSC 26.04.04 1" || return
+			;;
+		solus-xfce)
+			dracut_live_iso_setup \
+				"Solus Xfce 2026-04-18" \
+				"https://downloads.getsol.us/isos/2026-04-18/Solus-Xfce-Release-2026-04-18.iso" \
+				"quiet splash" || return
+			;;
+		*)
+			nb_error "Unknown community live ISO entry: $_community_live_tag"
+			return 1
+			;;
+	esac
 }
 
 nb_error ()
@@ -128,6 +200,7 @@ downloadandrun ()
 DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
 DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
 DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
+DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
 
 debian_live_iso_setup ()
 {
@@ -136,11 +209,11 @@ debian_live_iso_setup ()
 	DEBIAN_LIVE_BOOT_URL=
 	DEBIAN_LIVE_LABEL=
 	DEBIAN_LIVE_MODE=fetch
-	DEBIAN_LIVE_BOOT_STYLE=debian-live
 	DEBIAN_LIVE_OPTIONS=
 	DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
 	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
+	DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
 
 	case "$_debian_live_tag" in
 		butterbian-xfce)
@@ -192,6 +265,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="https://download.neptuneos.com/download/Neptune9-20260314.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=neptune"
 			;;
+		peppermint-trixie)
+			DEBIAN_LIVE_LABEL="Peppermint OS Debian 64"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/peppermintos/isos/XFCE/PeppermintOS-Debian-64.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=peppermint"
+			;;
 		refracta-xfce)
 			DEBIAN_LIVE_LABEL="Refracta 13.3 Xfce"
 			DEBIAN_LIVE_ISO_URL="https://get.refracta.org/files/stable/refracta_13.3_xfce_amd64-20260501_1208.iso"
@@ -206,6 +284,21 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="SolydX 13"
 			DEBIAN_LIVE_ISO_URL="http://ftp.nluug.nl/os/Linux/distr/solydxk/downloads/solydx_13_64_202512.iso"
 			DEBIAN_LIVE_OPTIONS="username=solydxk hostname=solydx"
+			;;
+		synex-icewm)
+			DEBIAN_LIVE_LABEL="Synex 13 IceWM"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/synex/Stable/ICEWM/synex-icewm-13-u8-amd64.hybrid.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=synex"
+			;;
+		synex-lxde)
+			DEBIAN_LIVE_LABEL="Synex 13 LXDE"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/synex/Stable/LXDE/synex-lxde-13-u8-amd64.hybrid.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=synex"
+			;;
+		synex-xfce)
+			DEBIAN_LIVE_LABEL="Synex 13 Xfce"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/synex/Stable/XFCE/synex-xfce-13-u8-amd64.hybrid.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=synex"
 			;;
 		wattos-r13)
 			DEBIAN_LIVE_LABEL="wattOS R13"
@@ -330,11 +423,13 @@ debian_live_repack_initrd_with_rootfs ()
 				rm -rf "$_debian_live_work"
 				return 1
 			fi
-			;;
+		;;
 	esac
 
-	mkdir -p "$_debian_live_work/live"
-	if ! mv "$_debian_live_rootfs" "$_debian_live_work/live/filesystem.squashfs"; then
+	_debian_live_embed_rootfs="$_debian_live_work/$DEBIAN_LIVE_EMBED_ROOTFS_PATH"
+	_debian_live_embed_rootfs_dir="${_debian_live_embed_rootfs%/*}"
+	mkdir -p "$_debian_live_embed_rootfs_dir"
+	if ! mv "$_debian_live_rootfs" "$_debian_live_embed_rootfs"; then
 		nb_error "Could not add the $DEBIAN_LIVE_LABEL live filesystem to the initramfs."
 		rm -rf "$_debian_live_work"
 		return 1
@@ -370,6 +465,8 @@ debian_live_repack_initrd_with_rootfs ()
 			fi
 			;;
 	esac
+
+	rm -rf "$_debian_live_work"
 
 	: >"$_debian_live_new"
 	if [ "$_debian_live_main_offset" -gt 0 ]; then
@@ -614,12 +711,15 @@ debian_live_prepare_from_iso ()
 		rm -f "$_debian_live_iso" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
 		return 0
 	fi
-	if [ "$DEBIAN_LIVE_MODE" != "embed" ]; then
+	case "$DEBIAN_LIVE_MODE" in
+		embed) ;;
+		*)
 		rm -f "$_debian_live_iso" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
 		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
 		rm -rf "$_debian_live_mount_dir"
 		return 0
-	fi
+			;;
+	esac
 	if ! debian_live_extract_boot_file "$_debian_live_iso" "$_debian_live_rootfs" "live filesystem" $DEBIAN_LIVE_ROOTFS_PATHS; then
 		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
 		rm -rf "$_debian_live_mount_dir"
@@ -641,9 +741,275 @@ debian_live_prepare_from_iso ()
 	return 0
 }
 
+pika_repack_initrd_with_iso ()
+{
+	_pika_iso="$1"
+	_pika_parent="${_pika_iso%/*}"
+	_pika_work="$_pika_parent/initrd-work"
+	_pika_repacked="$_pika_parent/nb-initrd.repacked"
+	_pika_new="$_pika_parent/nb-initrd.new"
+	_pika_final="$_pika_parent/nb-initrd"
+
+	if ! _pika_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $PIKA_LABEL initramfs compression format."
+		return 1
+	fi
+	_pika_format="${_pika_main_info%% *}"
+	_pika_main_offset="${_pika_main_info#* }"
+
+	if [ "$_pika_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$PIKA_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_pika_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$PIKA_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_pika_work" "$_pika_repacked" "$_pika_new" "$_pika_final"
+	mkdir -p "$_pika_work"
+	_pika_unpack_failed=
+
+	case "$_pika_format" in
+		gzip)
+			if ! ( tail -c +"$(( _pika_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_pika_work" && cpio -idmu ) ) 2>/tmp/nb-pika-cpio.log; then
+				_pika_unpack_failed=1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _pika_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_pika_work" && cpio -idmu ) ) 2>/tmp/nb-pika-cpio.log; then
+				_pika_unpack_failed=1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _pika_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_pika_work" && cpio -idmu ) ) 2>/tmp/nb-pika-cpio.log; then
+				_pika_unpack_failed=1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _pika_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_pika_work" && cpio -idmu ) ) 2>/tmp/nb-pika-cpio.log; then
+				_pika_unpack_failed=1
+			fi
+			;;
+	esac
+
+	if [ -n "$_pika_unpack_failed" ] && { [ ! -s "$_pika_work/init" ] || [ ! -s "$_pika_work/usr/bin/busybox" ]; }; then
+		nb_error "Could not unpack the $PIKA_LABEL $_pika_format initramfs.\nSee /tmp/nb-pika-cpio.log for details."
+		rm -rf "$_pika_work"
+		return 1
+	fi
+	if [ ! -s "$_pika_work/init" ]; then
+		nb_error "Could not find the $PIKA_LABEL booster init binary."
+		rm -rf "$_pika_work"
+		return 1
+	fi
+
+	mkdir -p "$_pika_work/.netbootcd"
+	if ! mv "$_pika_iso" "$_pika_work/.netbootcd/pika.iso"; then
+		nb_error "Could not embed the $PIKA_LABEL ISO into the initramfs."
+		rm -rf "$_pika_work"
+		return 1
+	fi
+
+	_pika_hooks_dir="$_pika_work/usr/share/booster/hooks-early"
+	if [ ! -d "$_pika_hooks_dir" ]; then
+		nb_error "Could not find the $PIKA_LABEL booster hooks directory."
+		rm -rf "$_pika_work"
+		return 1
+	fi
+	_pika_hook="$_pika_hooks_dir/00_netbootcd_pika_iso.sh"
+	cat >"$_pika_hook" <<'EOF'
+#!/usr/bin/busybox sh
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+
+BB=/usr/bin/busybox
+ISO=/.netbootcd/pika.iso
+
+netbootcd_pika_log()
+{
+	$BB echo "NetbootCD-Neo: $*" >/dev/console 2>/dev/null || true
+}
+
+$BB mkdir -p /proc /sys /dev 2>/dev/null || true
+$BB mount -t proc proc /proc 2>/dev/null || true
+$BB mount -t sysfs sysfs /sys 2>/dev/null || true
+$BB mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+
+case " $($BB cat /proc/cmdline 2>/dev/null) " in
+	*" boot=live "*) ;;
+	*) exit 0 ;;
+esac
+
+[ -e /dev/loop-control ] || $BB mknod /dev/loop-control c 10 237 2>/dev/null || true
+for PIKA_LOOP in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+	[ -e "/dev/loop$PIKA_LOOP" ] || $BB mknod "/dev/loop$PIKA_LOOP" b 7 "$PIKA_LOOP" 2>/dev/null || true
+done
+
+for PIKA_MODULE in loop cdrom isofs squashfs overlay; do
+	if ! $BB modprobe "$PIKA_MODULE" 2>/dev/null; then
+		[ -f "/usr/lib/modules/$PIKA_MODULE.ko" ] && $BB insmod "/usr/lib/modules/$PIKA_MODULE.ko" 2>/dev/null || true
+	fi
+done
+
+if [ ! -f "$ISO" ]; then
+	netbootcd_pika_log "embedded PikaOS ISO is missing"
+	exit 0
+fi
+
+PIKA_LOOP_DEVICE="$($BB losetup -f 2>/dev/null)"
+if [ -n "$PIKA_LOOP_DEVICE" ] && $BB losetup -r "$PIKA_LOOP_DEVICE" "$ISO" 2>/dev/null; then
+	netbootcd_pika_log "attached embedded PikaOS ISO to $PIKA_LOOP_DEVICE"
+	$BB blkid "$PIKA_LOOP_DEVICE" >/dev/console 2>/dev/null || true
+	exit 0
+fi
+
+for PIKA_LOOP in /dev/loop0 /dev/loop1 /dev/loop2 /dev/loop3 /dev/loop4 /dev/loop5 /dev/loop6 /dev/loop7 /dev/loop8 /dev/loop9 /dev/loop10 /dev/loop11 /dev/loop12 /dev/loop13 /dev/loop14 /dev/loop15; do
+	if $BB losetup -r "$PIKA_LOOP" "$ISO" 2>/dev/null; then
+		netbootcd_pika_log "attached embedded PikaOS ISO to $PIKA_LOOP"
+		$BB blkid "$PIKA_LOOP" >/dev/console 2>/dev/null || true
+		exit 0
+	fi
+done
+
+netbootcd_pika_log "could not attach embedded PikaOS ISO to a loop device"
+exit 0
+EOF
+	chmod 755 "$_pika_hook"
+	if [ ! -e "$_pika_work/usr/bin/sh" ]; then
+		( cd "$_pika_work/usr/bin" && ln -s busybox sh ) 2>/dev/null || true
+	fi
+
+	case "$_pika_format" in
+		gzip)
+			if ! ( cd "$_pika_work" && find . | cpio -o -H newc | gzip -1 -c >"$_pika_repacked" ); then
+				nb_error "Could not repack the $PIKA_LABEL gzip initramfs."
+				rm -rf "$_pika_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_pika_work" && find . | cpio -o -H newc | zstd -q -c >"$_pika_repacked" ); then
+				nb_error "Could not repack the $PIKA_LABEL zstd initramfs."
+				rm -rf "$_pika_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_pika_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_pika_repacked" ); then
+				nb_error "Could not repack the $PIKA_LABEL xz initramfs."
+				rm -rf "$_pika_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_pika_work" && find . | cpio -o -H newc >"$_pika_repacked" ); then
+				nb_error "Could not repack the $PIKA_LABEL cpio initramfs."
+				rm -rf "$_pika_work"
+				return 1
+			fi
+			;;
+	esac
+
+	rm -rf "$_pika_work"
+
+	: >"$_pika_new"
+	if [ "$_pika_main_offset" -gt 0 ]; then
+		if ! head -c "$_pika_main_offset" /tmp/nb-initrd >>"$_pika_new"; then
+			nb_error "Could not preserve the $PIKA_LABEL early initramfs prefix."
+			rm -f "$_pika_repacked" "$_pika_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_pika_repacked" >>"$_pika_new"; then
+		nb_error "Could not write the repacked $PIKA_LABEL initramfs."
+		rm -f "$_pika_repacked" "$_pika_new"
+		return 1
+	fi
+	mv "$_pika_new" "$_pika_final"
+	rm -f "$_pika_repacked" /tmp/nb-initrd
+	ln -s "$_pika_final" /tmp/nb-initrd
+	return 0
+}
+
+pika_prepare_from_iso ()
+{
+	_pika_iso_url="$1"
+	_pika_work="/tmp/nb-pika-work"
+	_pika_iso="$_pika_work/nb-pika.iso"
+	_pika_boot="$_pika_work/boot"
+	_pika_boot_image="$_pika_boot/Boot-NoEmul.img"
+
+	if ! PIKA_7Z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract PikaOS ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_pika_work " /proc/mounts 2>/dev/null; then
+		umount "$_pika_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_pika_work" /tmp/nb-pika-initrd-work
+	mkdir -p "$_pika_boot"
+	_pika_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_pika_work" 2>/tmp/nb-pika-mount.log; then
+		_pika_mounted=1
+		mkdir -p "$_pika_boot"
+	fi
+
+	if ! wgetgauge "$_pika_iso_url" "$_pika_iso" "Downloading $PIKA_LABEL ISO"; then
+		nb_error "Could not download $PIKA_LABEL ISO from:\n\n$_pika_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_pika_mounted" ] && umount "$_pika_work" 2>/dev/null || true
+		rm -rf "$_pika_work"
+		return 1
+	fi
+
+	if ! "$PIKA_7Z" e -y -o"$_pika_boot" "$_pika_iso" "[BOOT]/Boot-NoEmul.img" >/tmp/nb-pika-7z.log 2>&1; then
+		nb_error "Could not extract the $PIKA_LABEL EFI boot image.\nSee /tmp/nb-pika-7z.log for details."
+		[ -n "$_pika_mounted" ] && umount "$_pika_work" 2>/dev/null || true
+		rm -rf "$_pika_work"
+		return 1
+	fi
+	if [ ! -s "$_pika_boot_image" ]; then
+		nb_error "The $PIKA_LABEL ISO did not contain [BOOT]/Boot-NoEmul.img."
+		[ -n "$_pika_mounted" ] && umount "$_pika_work" 2>/dev/null || true
+		rm -rf "$_pika_work"
+		return 1
+	fi
+	if ! "$PIKA_7Z" e -y -o"$_pika_boot" "$_pika_boot_image" EFI/VMLINUZ EFI/INITRD >>/tmp/nb-pika-7z.log 2>&1; then
+		nb_error "Could not extract kernel and initrd from the $PIKA_LABEL EFI boot image.\nSee /tmp/nb-pika-7z.log for details."
+		[ -n "$_pika_mounted" ] && umount "$_pika_work" 2>/dev/null || true
+		rm -rf "$_pika_work"
+		return 1
+	fi
+	if [ ! -s "$_pika_boot/VMLINUZ" ] || [ ! -s "$_pika_boot/INITRD" ]; then
+		nb_error "The $PIKA_LABEL EFI boot image did not contain EFI/VMLINUZ and EFI/INITRD."
+		[ -n "$_pika_mounted" ] && umount "$_pika_work" 2>/dev/null || true
+		rm -rf "$_pika_work"
+		return 1
+	fi
+
+	mv "$_pika_boot/VMLINUZ" /tmp/nb-linux
+	mv "$_pika_boot/INITRD" /tmp/nb-initrd
+	rm -rf "$_pika_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $PIKA_LABEL ISO into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! pika_repack_initrd_with_iso "$_pika_iso"; then
+		[ -n "$_pika_mounted" ] && umount "$_pika_work" 2>/dev/null || true
+		rm -rf "$_pika_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f "$_pika_boot_image" /tmp/nb-pika-7z.log /tmp/nb-pika-mount.log
+	return 0
+}
+
 ARTIX_ISO_BASE="http://mirrors.ocf.berkeley.edu/artix-iso"
 VOID_ISO_BASE="http://repo-fastly.voidlinux.org/live/current"
 ALTLINUX_ISO_BASE="http://nightly.altlinux.org/sisyphus/current"
+GUIX_ISO_BASE="https://ftp.gnu.org/gnu/guix"
 
 artix_iso_file ()
 {
@@ -725,6 +1091,327 @@ iso_prepare_boot_files ()
 	mv "$_boot_dir/$_initrd_file" /tmp/nb-initrd
 	rm -f "$_iso_file" /tmp/nb-iso-7z.log
 	rm -rf "$_boot_dir"
+	return 0
+}
+
+iso_boot_setup ()
+{
+	ISO_BOOT_URL="$1"
+	ISO_BOOT_LABEL="$2"
+	ISO_BOOT_KERNEL_PATH="$3"
+	ISO_BOOT_INITRD_PATH="$4"
+}
+
+iso_boot_prepare_from_iso ()
+{
+	iso_prepare_boot_files \
+		"$ISO_BOOT_URL" \
+		/tmp/nb-iso-boot.iso \
+		/tmp/nb-iso-boot \
+		"$ISO_BOOT_KERNEL_PATH" \
+		"$ISO_BOOT_INITRD_PATH" \
+		"$ISO_BOOT_LABEL"
+}
+
+antix_mx_iso_file ()
+{
+	case "$1" in
+		antix-26-core) printf '%s\n' 'antix-linux/Final/antiX-26/antiX-26_x64-core.iso' ;;
+		mx-25.1-xfce) printf '%s\n' 'mx-linux/Final/Xfce/MX-25.1_Xfce_x64.iso' ;;
+		mx-25.1-xfce-ahs) printf '%s\n' 'mx-linux/Final/Xfce/MX-25.1_Xfce_ahs_x64.iso' ;;
+		*) return 1 ;;
+	esac
+}
+
+antix_mx_iso_label ()
+{
+	case "$1" in
+		antix-26-core) printf '%s\n' 'antiX 26 Core' ;;
+		mx-25.1-xfce) printf '%s\n' 'MX Linux 25.1 Xfce' ;;
+		mx-25.1-xfce-ahs) printf '%s\n' 'MX Linux 25.1 Xfce AHS' ;;
+		*) return 1 ;;
+	esac
+}
+
+antix_mx_iso_url ()
+{
+	_antix_mx_iso_file="$1"
+	printf 'http://downloads.sourceforge.net/project/%s\n' "$_antix_mx_iso_file"
+}
+
+antix_mx_iso_setup ()
+{
+	_antix_mx_iso_tag="$1"
+
+	if ! _antix_mx_iso_file=$(antix_mx_iso_file "$_antix_mx_iso_tag"); then
+		nb_error "Unknown antiX/MX Linux ISO entry: $_antix_mx_iso_tag"
+		return 1
+	fi
+	if ! ANTIX_MX_LABEL=$(antix_mx_iso_label "$_antix_mx_iso_tag"); then
+		nb_error "Unknown antiX/MX Linux ISO entry: $_antix_mx_iso_tag"
+		return 1
+	fi
+
+	ANTIX_MX_ISO_URL=$(antix_mx_iso_url "$_antix_mx_iso_file")
+	echo -n "from=all try=60 load=all sq=antiX/linuxfs quiet " >>/tmp/nb-options
+}
+
+antix_mx_add_embedded_linuxfs_hook ()
+{
+	_antix_mx_work="$1"
+	_antix_mx_hook="$_antix_mx_work/live/custom/antiX/0.sh"
+
+	mkdir -p "$_antix_mx_work/live/custom/antiX" \
+		"$_antix_mx_work/live/custom/MX" \
+		"$_antix_mx_work/live/custom/mx"
+	cat >"$_antix_mx_hook" <<'EOFH'
+find_linuxfs_file() {
+    if [ -f /antiX/linuxfs ]; then
+        heading "NetbootCD embedded linuxfs"
+        mkdir -p "$BOOT_MP/antiX"
+        if [ ! -f "$BOOT_MP/antiX/linuxfs" ]; then
+            mv /antiX/linuxfs "$BOOT_MP/antiX/linuxfs" \
+                || fatal "Could not move NetbootCD embedded linuxfs into place"
+        fi
+        SQFILE_FULL=$BOOT_MP/antiX/linuxfs
+        SQFILE_MP=$BOOT_MP
+        SQFILE_DEV=$BOOT_MP
+        SQFILE_PATH=antiX
+        DEFAULT_PERSIST_PATH=$SQFILE_PATH
+        SQFILE_DIR=$BOOT_MP/antiX
+        DEFAULT_DIR=$SQFILE_DIR
+        return 0
+    fi
+
+    if [ -n "${ISO_FILE:-}" ] || [ -n "${FROM_ISO:-}" ]; then
+        : ${ISO_FILE:=$DEFAULT_ISO_FILE}
+        ISO_FILE=${ISO_FILE#/}
+
+        heading "${cheat_co}fromiso"
+
+        find_boot_file "$ISO_FILE" "$ISO_DEV_MP" "$BOOT_ID" "$BOOT_RETRY" \
+            || fatal  "$_Could_not_find_X_file_Y_" iso "$(pqh $ISO_FILE)"
+
+        _nb_antix_iso_full=$ISO_DEV_MP/$ISO_FILE
+        DEFAULT_PERSIST_PATH=${ISO_FILE%/*}
+
+        [ "$CHECK_MD5" ] && check_md5 "$_nb_antix_iso_full"
+
+        mkdir -p $ISO_FILE_MP
+        mount -t iso9660 -o loop,ro "$_nb_antix_iso_full" $ISO_FILE_MP \
+            || mount -t udf -o loop,ro "$_nb_antix_iso_full" $ISO_FILE_MP \
+            || fatal_dmesg  "$_Could_not_mount_X_as_a_Y_file_" "$(pqh $_nb_antix_iso_full)" 'iso'
+
+        SQFILE_FULL="$ISO_FILE_MP/$SQFILE_FILE"
+        [ -f "$SQFILE_FULL" ] \
+            || linuxfs_error  "$_File_X_not_found_on_device_Y_" "$SQFILE_FULL" "$FOUND_DEV"
+
+        SQFILE_MP=$ISO_FILE_MP
+        BOOT_MP=$SQFILE_MP
+        SQFILE_DEV=$FOUND_DEV
+        SQFILE_PATH=${SQFILE_FILE%/*}
+
+        DID_ISO=true
+    else
+        find_crypt_or_linuxfs
+        tsplash_on
+
+        SQFILE_MP=$BOOT_MP
+        SQFILE_DEV=$FOUND_DEV
+
+        SQFILE_FULL=$BOOT_MP/$SQFILE_FILE
+        SQFILE_PATH=${SQFILE_FILE%/*}
+        DEFAULT_PERSIST_PATH=$SQFILE_PATH
+    fi
+
+    SQFILE_DIR=$(dirname $SQFILE_FULL)
+    DEFAULT_DIR=$SQFILE_DIR
+}
+EOFH
+	chmod 0755 "$_antix_mx_hook"
+	cp "$_antix_mx_hook" "$_antix_mx_work/live/custom/MX/0.sh"
+	cp "$_antix_mx_hook" "$_antix_mx_work/live/custom/mx/0.sh"
+}
+
+antix_mx_repack_initrd_with_linuxfs ()
+{
+	_antix_mx_iso="$1"
+	_antix_mx_work="/tmp/nb-antix-mx-initrd-work"
+	_antix_mx_repacked="/tmp/nb-initrd.antix-mx"
+
+	if ! _antix_mx_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $ANTIX_MX_LABEL live files."
+		return 1
+	fi
+	if ! _antix_mx_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $ANTIX_MX_LABEL initramfs compression format."
+		return 1
+	fi
+	_antix_mx_format="${_antix_mx_main_info%% *}"
+	_antix_mx_main_offset="${_antix_mx_main_info#* }"
+
+	if [ "$_antix_mx_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$ANTIX_MX_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_antix_mx_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$ANTIX_MX_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_antix_mx_work" "$_antix_mx_repacked"
+	mkdir -p "$_antix_mx_work"
+
+	case "$_antix_mx_format" in
+		gzip)
+			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_antix_mx_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $ANTIX_MX_LABEL gzip initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_antix_mx_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $ANTIX_MX_LABEL zstd initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_antix_mx_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $ANTIX_MX_LABEL xz initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_antix_mx_work" && cpio -idm ) ); then
+				nb_error "Could not unpack the $ANTIX_MX_LABEL cpio initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$_antix_mx_work/antiX"
+	if ! "$_antix_mx_7z" e -y -o"$_antix_mx_work/antiX" "$_antix_mx_iso" antiX/linuxfs >/tmp/nb-antix-mx-7z.log 2>&1; then
+		nb_error "Could not extract antiX/linuxfs from the $ANTIX_MX_LABEL ISO.\nSee /tmp/nb-antix-mx-7z.log for details."
+		rm -rf "$_antix_mx_work"
+		return 1
+	fi
+	if [ ! -s "$_antix_mx_work/antiX/linuxfs" ]; then
+		nb_error "The $ANTIX_MX_LABEL ISO did not contain antiX/linuxfs."
+		rm -rf "$_antix_mx_work"
+		return 1
+	fi
+	rm -f "$_antix_mx_iso"
+
+	antix_mx_add_embedded_linuxfs_hook "$_antix_mx_work"
+
+	case "$_antix_mx_format" in
+		gzip)
+			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc | gzip -1 -c >"$_antix_mx_repacked" ); then
+				nb_error "Could not repack the $ANTIX_MX_LABEL gzip initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc | zstd -q -c >"$_antix_mx_repacked" ); then
+				nb_error "Could not repack the $ANTIX_MX_LABEL zstd initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_antix_mx_repacked" ); then
+				nb_error "Could not repack the $ANTIX_MX_LABEL xz initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc >"$_antix_mx_repacked" ); then
+				nb_error "Could not repack the $ANTIX_MX_LABEL cpio initramfs."
+				rm -rf "$_antix_mx_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_antix_mx_main_offset" -gt 0 ]; then
+		if ! head -c "$_antix_mx_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $ANTIX_MX_LABEL early initramfs prefix."
+			rm -rf "$_antix_mx_work" "$_antix_mx_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_antix_mx_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $ANTIX_MX_LABEL initramfs."
+		rm -rf "$_antix_mx_work" "$_antix_mx_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_antix_mx_work" "$_antix_mx_repacked" /tmp/nb-antix-mx-7z.log
+	return 0
+}
+
+antix_mx_prepare_from_iso ()
+{
+	_antix_mx_iso_url="$1"
+	_antix_mx_iso="/tmp/nb-antix-mx.iso"
+	_antix_mx_boot="/tmp/nb-antix-mx-boot"
+
+	if ! _antix_mx_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $ANTIX_MX_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd "$_antix_mx_iso"
+	rm -rf "$_antix_mx_boot" /tmp/nb-antix-mx-initrd-work /tmp/nb-initrd.antix-mx /tmp/nb-initrd.new
+	mkdir -p "$_antix_mx_boot"
+
+	if ! wgetgauge "$_antix_mx_iso_url" "$_antix_mx_iso" "Downloading $ANTIX_MX_LABEL ISO"; then
+		nb_error "Could not download $ANTIX_MX_LABEL ISO from:\n\n$_antix_mx_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		rm -f "$_antix_mx_iso"
+		rm -rf "$_antix_mx_boot"
+		return 1
+	fi
+
+	if ! "$_antix_mx_7z" e -y -o"$_antix_mx_boot" "$_antix_mx_iso" antiX/vmlinuz antiX/initrd.gz >/tmp/nb-antix-mx-7z.log 2>&1; then
+		nb_error "Could not extract $ANTIX_MX_LABEL boot files from the ISO.\nSee /tmp/nb-antix-mx-7z.log for details."
+		rm -f "$_antix_mx_iso"
+		rm -rf "$_antix_mx_boot"
+		return 1
+	fi
+	if [ ! -s "$_antix_mx_boot/vmlinuz" ]; then
+		nb_error "The $ANTIX_MX_LABEL ISO did not contain antiX/vmlinuz."
+		rm -f "$_antix_mx_iso"
+		rm -rf "$_antix_mx_boot"
+		return 1
+	fi
+	if [ ! -s "$_antix_mx_boot/initrd.gz" ]; then
+		nb_error "The $ANTIX_MX_LABEL ISO did not contain antiX/initrd.gz."
+		rm -f "$_antix_mx_iso"
+		rm -rf "$_antix_mx_boot"
+		return 1
+	fi
+
+	mv "$_antix_mx_boot/vmlinuz" /tmp/nb-linux
+	mv "$_antix_mx_boot/initrd.gz" /tmp/nb-initrd
+	rm -rf "$_antix_mx_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding antiX/linuxfs from the $ANTIX_MX_LABEL ISO into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! antix_mx_repack_initrd_with_linuxfs "$_antix_mx_iso"; then
+		rm -f "$_antix_mx_iso"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.antix-mx
+		rm -rf /tmp/nb-antix-mx-initrd-work
+		return 1
+	fi
+
+	rm -f "$_antix_mx_iso" /tmp/nb-antix-mx-7z.log
 	return 0
 }
 
@@ -977,6 +1664,425 @@ altlinux_prepare_from_iso ()
 	iso_prepare_boot_files "$_altlinux_iso_url" /tmp/nb-altlinux.iso /tmp/nb-altlinux-boot boot/vmlinuz boot/initrd.img "ALT Linux"
 }
 
+guix_iso_setup ()
+{
+	_guix_version="$1"
+
+	case "$_guix_version" in
+		''|*[!A-Za-z0-9._-]*)
+			nb_error "Invalid GNU Guix System version: $_guix_version"
+			return 1
+			;;
+	esac
+
+	GUIX_LABEL="GNU Guix System $_guix_version"
+	GUIX_ISO_URL="$GUIX_ISO_BASE/guix-system-install-$_guix_version.x86_64-linux.iso"
+}
+
+guix_repack_initrd_with_iso_root ()
+{
+	_guix_iso="$1"
+	_guix_work="/tmp/nb-guix-initrd-work"
+	_guix_repacked="/tmp/nb-initrd.guix"
+
+	if ! _guix_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $GUIX_LABEL module files."
+		return 1
+	fi
+	if ! _guix_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $GUIX_LABEL initramfs compression format."
+		return 1
+	fi
+	_guix_format="${_guix_main_info%% *}"
+	_guix_main_offset="${_guix_main_info#* }"
+
+	if [ "$_guix_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$GUIX_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_guix_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$GUIX_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_guix_work" "$_guix_repacked"
+	mkdir -p "$_guix_work"
+
+	case "$_guix_format" in
+		gzip)
+			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_guix_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GUIX_LABEL gzip initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_guix_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GUIX_LABEL zstd initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_guix_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GUIX_LABEL xz initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_guix_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GUIX_LABEL cpio initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$_guix_work/.netbootcd-modules"
+	for _guix_module_path in \
+		'gnu/store/*-linux-libre-*/lib/modules/*/kernel/fs/isofs/isofs.ko*' \
+		'gnu/store/*-linux-libre-*/lib/modules/*/kernel/fs/udf/udf.ko*' \
+		'gnu/store/*-linux-libre-*/lib/modules/*/kernel/fs/overlayfs/overlay.ko*' \
+		'gnu/store/*-linux-libre-*/lib/modules/*/kernel/drivers/block/loop.ko*' \
+		'gnu/store/*-linux-libre-*/lib/modules/*/kernel/block/loop.ko*'
+	do
+		"$_guix_7z" e -y -o"$_guix_work/.netbootcd-modules" "$_guix_iso" "$_guix_module_path" >>/tmp/nb-guix-7z.log 2>&1 || true
+	done
+
+	if ! mv "$_guix_iso" "$_guix_work/.netbootcd-guix.iso"; then
+		nb_error "Could not embed the $GUIX_LABEL ISO into the initramfs."
+		rm -rf "$_guix_work"
+		return 1
+	fi
+
+	_guix_linux_boot_scm=$(find "$_guix_work/gnu/store" -path '*/gnu/store/*-module-import/gnu/build/linux-boot.scm' 2>/dev/null | head -1)
+	if [ -z "$_guix_linux_boot_scm" ]; then
+		_guix_linux_boot_scm=$(find "$_guix_work/gnu/store" -path '*/gnu/build/linux-boot.scm' 2>/dev/null | head -1)
+	fi
+	if [ -z "$_guix_linux_boot_scm" ] || [ ! -f "$_guix_linux_boot_scm" ]; then
+		nb_error "Could not find Guix's linux-boot.scm in the embedded installer root."
+		rm -rf "$_guix_work"
+		return 1
+	fi
+
+	find "$_guix_work/gnu/store" -path '*/gnu/build/linux-boot.go' 2>/dev/null |
+	while read -r _guix_linux_boot_go; do
+		[ -n "$_guix_linux_boot_go" ] && rm -f "$_guix_linux_boot_go"
+	done
+
+	: >"$_guix_work/.netbootcd-guix-root"
+	cat >>"$_guix_linux_boot_scm" <<'EOFG'
+
+(use-modules (system foreign)
+             (ice-9 binary-ports))
+
+(define %netbootcd-guix-ioctl-int
+  ((@@ (guix build syscalls) syscall->procedure)
+   int "ioctl" (list int unsigned-long int)))
+(define %netbootcd-loop-set-fd #x4c00)
+
+(define %netbootcd-original-mount-root-file-system mount-root-file-system)
+(define* (mount-root-file-system root type
+                                 #:key volatile-root? (flags 0) options
+                                 check? skip-check-if-clean? repair)
+  (if (file-exists? "/.netbootcd-guix-root")
+      (let ((root-device (netbootcd-guix-root-device)))
+        (format #t "NetbootCD-Neo: mounting embedded Guix ISO from ~a.~%"
+                root-device)
+        (netbootcd-guix-load-module "/.netbootcd-modules/isofs.ko")
+        (netbootcd-guix-load-module "/.netbootcd-modules/udf.ko")
+        (netbootcd-guix-load-module "/.netbootcd-modules/overlay.ko")
+        (mkdir-p "/real-root")
+        (mkdir-p "/rw-root")
+        (mkdir-p "/root")
+        (catch 'system-error
+          (lambda ()
+            (mount root-device "/real-root" "iso9660" MS_RDONLY ""))
+          (lambda args
+            (format (current-error-port)
+                    "NetbootCD-Neo: iso9660 mount failed, trying udf.~%")
+            (mount root-device "/real-root" "udf" MS_RDONLY "")))
+        (mount "none" "/rw-root" "tmpfs")
+        (mkdir-p "/rw-root/upper")
+        (mkdir-p "/rw-root/work")
+        (mkdir-p "/rw-root/upper/dev")
+        (false-if-exception
+         (mount "none" "/rw-root/upper/dev" "devtmpfs"))
+        (mount "none" "/root" "overlay" 0
+               "lowerdir=/real-root,upperdir=/rw-root/upper,workdir=/rw-root/work"))
+      (%netbootcd-original-mount-root-file-system
+       root type
+       #:volatile-root? volatile-root?
+       #:flags flags
+       #:options options
+       #:check? check?
+       #:skip-check-if-clean? skip-check-if-clean?
+       #:repair repair)))
+
+(define (netbootcd-guix-load-module module)
+  (let loop ((candidates (list module
+                               (string-append module ".zst")
+                               (string-append module ".xz")
+                               (string-append module ".gz"))))
+    (match candidates
+      (() #f)
+      ((candidate rest ...)
+       (if (file-exists? candidate)
+           (false-if-exception
+            (load-linux-module* candidate #:recursive? #f))
+           (loop rest))))))
+
+(define (netbootcd-guix-root-device)
+  (or (netbootcd-guix-loop-device)
+      (netbootcd-guix-ram-device)
+      (error "could not attach embedded Guix ISO to a block device")))
+
+(define (netbootcd-guix-loop-device)
+  (netbootcd-guix-load-module "/.netbootcd-modules/loop.ko")
+  (let ((iso-port (open-file "/.netbootcd-guix.iso" "rb")))
+    (let loop ((number 0))
+      (if (> number 15)
+          (begin
+            (close-port iso-port)
+            #f)
+          (let ((device (string-append "/dev/loop" (number->string number))))
+            (unless (file-exists? device)
+              (false-if-exception
+               (mknod device 'block-special #o660 (device-number 7 number))))
+            (if (netbootcd-guix-loop-set-fd device iso-port)
+                (begin
+                  (close-port iso-port)
+                  device)
+                (loop (+ number 1))))))))
+
+(define (netbootcd-guix-loop-set-fd device iso-port)
+  (catch 'system-error
+    (lambda ()
+      (let ((loop-port (open-file device "r0")))
+        (let-values (((ret err)
+                      (%netbootcd-guix-ioctl-int
+                       (fileno loop-port)
+                       %netbootcd-loop-set-fd
+                       (fileno iso-port))))
+          (close-port loop-port)
+          (if (zero? ret)
+              #t
+              (begin
+                (unless (= err EBUSY)
+                  (format (current-error-port)
+                          "NetbootCD-Neo: LOOP_SET_FD failed on ~a: ~a~%"
+                          device (strerror err)))
+                #f)))))
+    (lambda args
+      (let ((errno (system-error-errno args)))
+        (format (current-error-port)
+                "NetbootCD-Neo: could not open ~a: ~a~%"
+                device (strerror errno)))
+      #f)))
+
+(define (netbootcd-guix-ram-device)
+  (let ((device "/dev/ram0"))
+    (unless (file-exists? device)
+      (false-if-exception
+       (mknod device 'block-special #o660 (device-number 1 0))))
+    (catch 'system-error
+      (lambda ()
+        (format #t "NetbootCD-Neo: copying embedded Guix ISO to ~a.~%"
+                device)
+        (netbootcd-guix-copy-file "/.netbootcd-guix.iso" device)
+        (false-if-exception
+         (delete-file "/.netbootcd-guix.iso"))
+        device)
+      (lambda args
+        (let ((errno (system-error-errno args)))
+          (format (current-error-port)
+                  "NetbootCD-Neo: could not use ~a: ~a~%"
+                  device (strerror errno)))
+        #f))))
+
+(define (netbootcd-guix-copy-file source target)
+  (let ((in (open-file source "rb"))
+        (out (open-file target "r+b0")))
+    (let loop ()
+      (let ((bytes (get-bytevector-n in 1048576)))
+        (if (eof-object? bytes)
+            (begin
+              (close-port in)
+              (close-port out)
+              #t)
+            (begin
+              (put-bytevector out bytes)
+              (loop)))))))
+EOFG
+
+	case "$_guix_format" in
+		gzip)
+			if ! ( cd "$_guix_work" && find . | cpio -o -H newc | gzip -1 -c >"$_guix_repacked" ); then
+				nb_error "Could not repack the $GUIX_LABEL gzip initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_guix_work" && find . | cpio -o -H newc | zstd -q -c >"$_guix_repacked" ); then
+				nb_error "Could not repack the $GUIX_LABEL zstd initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_guix_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_guix_repacked" ); then
+				nb_error "Could not repack the $GUIX_LABEL xz initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_guix_work" && find . | cpio -o -H newc >"$_guix_repacked" ); then
+				nb_error "Could not repack the $GUIX_LABEL cpio initramfs."
+				rm -rf "$_guix_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_guix_main_offset" -gt 0 ]; then
+		if ! head -c "$_guix_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $GUIX_LABEL early initramfs prefix."
+			rm -rf "$_guix_work" "$_guix_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_guix_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $GUIX_LABEL initramfs."
+		rm -rf "$_guix_work" "$_guix_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_guix_work" "$_guix_repacked" /tmp/nb-guix-7z.log
+	return 0
+}
+
+guix_prepare_from_iso ()
+{
+	_guix_iso_url="$1"
+	_guix_iso="/tmp/nb-guix.iso"
+	_guix_boot="/tmp/nb-guix-boot"
+	_guix_grub_cfg="$_guix_boot/grub.cfg"
+
+	if ! _guix_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $GUIX_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd "$_guix_iso"
+	rm -rf "$_guix_boot" /tmp/nb-guix-initrd-work /tmp/nb-initrd.guix /tmp/nb-initrd.new
+	mkdir -p "$_guix_boot"
+
+	if ! wgetgauge "$_guix_iso_url" "$_guix_iso" "Downloading $GUIX_LABEL ISO"; then
+		nb_error "Could not download $GUIX_LABEL ISO from:\n\n$_guix_iso_url\n\nThis entry needs enough RAM to hold and repack the installer ISO."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+
+	if ! "$_guix_7z" e -y -o"$_guix_boot" "$_guix_iso" boot/grub/grub.cfg >/tmp/nb-guix-7z.log 2>&1; then
+		nb_error "Could not extract the $GUIX_LABEL GRUB configuration from the ISO.\nSee /tmp/nb-guix-7z.log for details."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+	if [ ! -s "$_guix_grub_cfg" ]; then
+		nb_error "The $GUIX_LABEL ISO did not contain boot/grub/grub.cfg."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+
+	_guix_linux_line=$(sed -n 's/^[	 ]*linux[	 ][	 ]*//p;s/^[	 ]*linuxefi[	 ][	 ]*//p' "$_guix_grub_cfg" | head -1)
+	_guix_initrd_line=$(sed -n 's/^[	 ]*initrd[	 ][	 ]*//p;s/^[	 ]*initrdefi[	 ][	 ]*//p' "$_guix_grub_cfg" | head -1)
+	if [ -z "$_guix_linux_line" ] || [ -z "$_guix_initrd_line" ]; then
+		nb_error "Could not parse the $GUIX_LABEL kernel and initrd paths from GRUB."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+
+	_guix_kernel_path=$(printf '%s\n' "$_guix_linux_line" | awk '{ print $1 }')
+	_guix_kernel_path="${_guix_kernel_path#/}"
+	_guix_cmdline=$(printf '%s\n' "$_guix_linux_line" | awk '
+		{
+			sep = ""
+			for (i = 2; i <= NF; i++) {
+				if ($i ~ /^(root|rootfstype|rootflags|fsck[.]mode)=/) {
+					continue
+				}
+				printf "%s%s", sep, $i
+				sep = " "
+			}
+		}
+	')
+
+	_guix_initrd_path=$(printf '%s\n' "$_guix_initrd_line" | awk '{ print $1 }')
+	_guix_initrd_path="${_guix_initrd_path#/}"
+	if [ -z "$_guix_kernel_path" ] || [ -z "$_guix_initrd_path" ]; then
+		nb_error "Could not parse the $GUIX_LABEL kernel and initrd filenames from GRUB."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+
+	if ! "$_guix_7z" e -y -o"$_guix_boot" "$_guix_iso" "$_guix_kernel_path" "$_guix_initrd_path" >/tmp/nb-guix-7z.log 2>&1; then
+		nb_error "Could not extract $GUIX_LABEL boot files from the ISO.\nSee /tmp/nb-guix-7z.log for details."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+
+	_guix_kernel_file="${_guix_kernel_path##*/}"
+	_guix_initrd_file="${_guix_initrd_path##*/}"
+	if [ ! -s "$_guix_boot/$_guix_kernel_file" ]; then
+		nb_error "The $GUIX_LABEL ISO did not contain $_guix_kernel_path."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+	if [ ! -s "$_guix_boot/$_guix_initrd_file" ]; then
+		nb_error "The $GUIX_LABEL ISO did not contain $_guix_initrd_path."
+		rm -f "$_guix_iso"
+		rm -rf "$_guix_boot"
+		return 1
+	fi
+
+	mv "$_guix_boot/$_guix_kernel_file" /tmp/nb-linux
+	mv "$_guix_boot/$_guix_initrd_file" /tmp/nb-initrd
+	rm -rf "$_guix_boot"
+	_guix_iso_bytes=$(wc -c <"$_guix_iso" | tr -d '[:space:]')
+	case "$_guix_iso_bytes" in
+		''|*[!0-9]*)
+			_guix_ramdisk_kb=1600000
+			;;
+		*)
+			_guix_ramdisk_kb=$(( ( _guix_iso_bytes + 1048575 ) / 1024 + 131072 ))
+			;;
+	esac
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $GUIX_LABEL installer filesystem into the initrd.\n\nThis can take a while and needs plenty of RAM." 7 70 || true
+	if ! guix_repack_initrd_with_iso_root "$_guix_iso"; then
+		rm -f "$_guix_iso"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.guix
+		rm -rf /tmp/nb-guix-initrd-work
+		return 1
+	fi
+
+	printf '%s' "root=/dev/null rootfstype=tmpfs fsck.mode=skip ramdisk_size=$_guix_ramdisk_kb $_guix_cmdline netbootcd_guix=1 " >>/tmp/nb-options
+	rm -f "$_guix_iso" /tmp/nb-guix-7z.log
+	return 0
+}
+
 artix_dns_option ()
 {
 	_artix_dns_list=
@@ -1083,9 +2189,7 @@ make_artix_iso_overlay ()
 	mkdir -p "$_overlay_dir/hooks"
 	printf '%s\n' "$_artix_iso_url" >"$_overlay_dir/.nb-artix-iso-url"
 
-	cat >"$_overlay_dir/hooks/netbootcd_artix_iso" <<'EOFH'
-# vim: set ft=sh:
-
+cat >"$_overlay_dir/hooks/netbootcd_artix_iso" <<'EOFH'
 run_hook() {
     msg ":: NetbootCD Artix ISO hook starting..."
     _nb_artix_iso_url="${artix_iso_url:-}"
@@ -1651,11 +2755,7 @@ artix_prepare_from_iso ()
 }
 
 
-# Download URL ($1) to OUT ($2) showing a dialog --gauge progress bar with
-# LABEL ($3).  We HEAD the URL to learn the expected size, then run wget in
-# the background and poll the output file's size.  Falls back to plain $WGET
-# if the server doesn't expose a Content-Length.  Designed to work with both
-# GNU and BusyBox wget (TinyCore ships BusyBox by default).
+# Download URL ($1) to OUT ($2) with a dialog gauge when Content-Length exists.
 wgetgauge ()
 {
 	_url="$1"
@@ -1724,13 +2824,11 @@ wgetgauge ()
 
 askforopts ()
 {
-#Extra kernel options can be useful in some cases; i.e. hardware problems, Debian preseeding, or maybe you just want to utilise your whole 1280x1024 monitor (use: vga=794).
-# dialog --inputbox is unreliable on BusyBox-based systems (TinyCore); use --yesno + read instead.
-if dialog --backtitle "$TITLE" --defaultno --yesno "Would you like to pass extra kernel parameters to the new kernel?" 6 60; then
-	printf 'Extra kernel parameters: '
-	read NB_CUSTOM
-	printf '%s' "$NB_CUSTOM" >/tmp/nb-custom
-fi
+	if dialog --backtitle "$TITLE" --defaultno --yesno "Would you like to pass extra kernel parameters to the new kernel?" 6 60; then
+		printf 'Extra kernel parameters: '
+		read -r NB_CUSTOM
+		printf '%s' "$NB_CUSTOM" >/tmp/nb-custom
+	fi
 }
 
 
@@ -1742,7 +2840,6 @@ wifimenu ()
 		return
 	fi
 
-	# Detect wireless interface - check sys/class/net first (works for DOWN interfaces too)
 	WIFI_IFACE=""
 	for _d in /sys/class/net/*/wireless; do
 		[ -d "$_d" ] && WIFI_IFACE=$(basename "$(dirname "$_d")") && break
@@ -1759,14 +2856,12 @@ wifimenu ()
 
 	ifconfig "$WIFI_IFACE" up 2>/dev/null || true
 
-	# Scan for networks
 	SSID_COUNT=0
 	if command -v iw >/dev/null 2>&1; then
 		dialog --backtitle "$TITLE" --infobox \
 			"Scanning for wireless networks on $WIFI_IFACE...\nThis may take a few seconds." 5 57 || true
 		sleep 2
 		iw dev "$WIFI_IFACE" scan 2>/dev/null > /tmp/nb-wifiscan || true
-		# Retry once if the first scan returned nothing (card may still be initializing)
 		if [ ! -s /tmp/nb-wifiscan ]; then
 			sleep 3
 			iw dev "$WIFI_IFACE" scan 2>/dev/null > /tmp/nb-wifiscan || true
@@ -1780,7 +2875,6 @@ wifimenu ()
 		touch /tmp/nb-ssidlist
 	fi
 
-	# Show networks and get SSID from user
 	if [ "$SSID_COUNT" -gt 0 ]; then
 		set --
 		i=1
@@ -1796,7 +2890,7 @@ wifimenu ()
 		rm -f /tmp/nb-wifisel
 		if [ "$WIFI_SEL" = "manual" ]; then
 			printf 'SSID: '
-			read _SSID
+			read -r _SSID
 			if [ -z "$_SSID" ]; then rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; fi
 			printf '%s' "$_SSID" >/tmp/nb-wifissid
 		else
@@ -1804,7 +2898,7 @@ wifimenu ()
 		fi
 	else
 		printf 'No networks found. SSID: '
-		read _SSID
+		read -r _SSID
 		if [ -z "$_SSID" ]; then rm -f /tmp/nb-wifissid /tmp/nb-ssidlist /tmp/nb-wifiscan; return; fi
 		printf '%s' "$_SSID" >/tmp/nb-wifissid
 	fi
@@ -1814,7 +2908,6 @@ wifimenu ()
 
 	if [ -z "$SSID" ]; then return; fi
 
-	# Get password (blank = open network)
 	dialog --backtitle "$TITLE" --inputbox "Password for \"$SSID\":\n(Leave blank for an open network)" 8 60 2>/tmp/nb-wifipass || { rm -f /tmp/nb-wifipass; return; }
 	WIFI_PASS=$(cat /tmp/nb-wifipass)
 	rm -f /tmp/nb-wifipass
@@ -1833,12 +2926,10 @@ wifimenu ()
 		>/tmp/nb-wpa.log 2>&1 || true
 	sleep 4
 
-	# Check association
 	CONNECTED=0
 	if command -v iw >/dev/null 2>&1; then
 		iw dev "$WIFI_IFACE" link 2>/dev/null | grep -q "SSID:" && CONNECTED=1 || true
 	else
-		# Fallback: if wpa_supplicant is still running, assume association succeeded
 		pidof wpa_supplicant >/dev/null 2>&1 && CONNECTED=1 || true
 	fi
 
@@ -1848,13 +2939,11 @@ wifimenu ()
 		return
 	fi
 
-	# Request IP via DHCP
 	dialog --backtitle "$TITLE" --infobox "Requesting IP address via DHCP..." 4 45 || true
 	killall udhcpc 2>/dev/null || true
 	udhcpc -i "$WIFI_IFACE" -q >/dev/null 2>&1 || true
 	sleep 2
 
-	# Verify internet connectivity
 	if wget --no-check-certificate --tries=1 -T 10 --spider \
 		http://www.example.com >/dev/null 2>&1; then
 		echo > /tmp/internet-is-up
@@ -1873,7 +2962,6 @@ wifimenu ()
 
 ipadrmenu ()
 {
-	# Enumerate network interfaces from /sys/class/net (skip loopback and tunnels)
 	IFACE_COUNT=0
 	set --
 	for _iface in /sys/class/net/*; do
@@ -1897,14 +2985,14 @@ ipadrmenu ()
 		rm -f /tmp/nb-ifsel
 		if [ "$IFACE_SEL" = "manual" ]; then
 			printf 'Network interface: '
-			read IFACE
+			read -r IFACE
 			if [ -z "$IFACE" ]; then return 0; fi
 		else
 			IFACE="$IFACE_SEL"
 		fi
 	else
 		printf 'Network interface [eth0]: '
-		read IFACE
+		read -r IFACE
 		IFACE="${IFACE:-eth0}"
 	fi
 	IFINFO=$(ifconfig "$IFACE" 2>&1) || true
@@ -1934,16 +3022,30 @@ INITRDURL=
 ARTIX_ISO_URL=
 VOID_ISO_URL=
 ALTLINUX_ISO_URL=
+GUIX_ISO_URL=
+GUIX_LABEL=
+PIKA_ISO_URL=
+PIKA_LABEL=
+PIKA_ISO_FILE=
+PIKA_ISO_VOLUME=
+ISO_BOOT_URL=
+ISO_BOOT_LABEL=
+ISO_BOOT_KERNEL_PATH=
+ISO_BOOT_INITRD_PATH=
+ANTIX_MX_ISO_URL=
+ANTIX_MX_LABEL=
 DEBIAN_LIVE_ISO_URL=
 DEBIAN_LIVE_BOOT_URL=
 DEBIAN_LIVE_MODE=
-dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 19 \
+dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 20 \
 ubuntu "Ubuntu" \
 ubuntuflavor "Ubuntu flavors and derivatives" \
 debian "Debian GNU/Linux" \
 debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
 debianlive "Debian-based live installers" \
+antixmx "antiX / MX Linux live installers" \
+communitylive "Community live installers" \
 q4os "Q4OS Trinity 6.6" \
 fedora "Fedora" \
 opensuse "openSUSE" \
@@ -1958,6 +3060,7 @@ arch "Arch Linux" \
 artix "Artix Linux" \
 void "Void Linux" \
 altlinux "ALT Linux" \
+guix "GNU Guix System" \
 slackware "Slackware" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
@@ -1996,21 +3099,17 @@ if [ $DISTRO = "ubuntu" ];then
 			"https://github.com/netbootxyz/ubuntu-squash/releases/download/22.04.5-be230164/initrd" \
 			"https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso" || return
 	else
-		#Set the URL to download the kernel and initrd from. The server used here is archive.ubuntu.com.
 		KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
 		INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/initrd.gz"
-		# Test if distro-updates exists
-		if ! $WGET --spider -q $KERNELURL; then # fallback to known distro
+		if ! $WGET --spider -q "$KERNELURL"; then
 			KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/linux"
 			INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/initrd.gz"
 		fi
-		if ! $WGET --spider -q $KERNELURL; then # try new path
+		if ! $WGET --spider -q "$KERNELURL"; then
 			KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/linux"
 			INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/initrd.gz"
 		fi
-		#These options are good for all Ubuntu installers.
 		echo -n 'vga=normal quiet '>>/tmp/nb-options
-		#If the user wants a command-line install, then add some more kernel arguments. The CLI install is akin to "standard system" in Debian.
 		if dialog --yesno "Would you like to install language packs?\n(Choose no for a command-line system.)" 7 43;then
 			echo -n 'tasks=standard pkgsel/language-pack-patterns= pkgsel/install-language-support=false'>>/tmp/nb-options
 		fi
@@ -2018,7 +3117,7 @@ if [ $DISTRO = "ubuntu" ];then
 fi
 if [ $DISTRO = "ubuntuflavor" ];then
 	UBUNTU_LIVE_CUSTOM=
-	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 22 75 13 \
+	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 24 78 17 \
 	kubuntu-26.04 "Kubuntu 26.04 LTS" \
 	xubuntu-26.04 "Xubuntu 26.04 LTS" \
 	lubuntu-26.04 "Lubuntu 26.04 LTS" \
@@ -2027,10 +3126,13 @@ if [ $DISTRO = "ubuntuflavor" ];then
 	studio-26.04 "Ubuntu Studio 26.04 LTS" \
 	unity-26.04 "Ubuntu Unity 26.04 LTS" \
 	edubuntu-26.04 "Edubuntu 26.04 LTS" \
-	mate-24.04 "Ubuntu MATE 24.04.4 LTS" \
-	funos-24.04 "FunOS 24.04.4 LTS Calamares" \
-	linuxlite-7.8 "Linux Lite 7.8" \
-	rhino-2025.4 "Rhino Linux 2025.4" \
+		mate-24.04 "Ubuntu MATE 24.04.4 LTS" \
+		bodhi-7.0 "Bodhi Linux 7.0.0" \
+		funos-24.04 "FunOS 24.04.4 LTS Calamares" \
+		linuxlite-7.8 "Linux Lite 7.8" \
+		rhino-2025.4 "Rhino Linux 2025.4" \
+	trisquel-mini-12 "Trisquel Mini 12.0" \
+	trisquel-netinst-12 "Trisquel 12.0 NetInstall" \
 	Manual "Manually enter an Ubuntu live ISO URL" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
@@ -2054,6 +3156,13 @@ if [ $DISTRO = "ubuntuflavor" ];then
 	elif [ "$VERSION" = "mate-24.04" ]; then
 		UBUNTU_KERNEL_SERIES="noble"
 		ISODEFAULT="https://cdimage.ubuntu.com/ubuntu-mate/releases/24.04/release/ubuntu-mate-24.04.4-desktop-amd64.iso"
+	elif [ "$VERSION" = "bodhi-7.0" ]; then
+		ubuntu_casper_iso_setup \
+			"Bodhi Linux 7.0.0" \
+			"http://downloads.sourceforge.net/project/bodhilinux/7.0.0/bodhi-7.0.0-64.iso" \
+			"username=bodhi hostname=bodhi" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
 	elif [ "$VERSION" = "funos-24.04" ]; then
 		ubuntu_casper_iso_setup \
 			"FunOS 24.04.4 LTS Calamares" \
@@ -2075,6 +3184,22 @@ if [ $DISTRO = "ubuntuflavor" ];then
 			"http://downloads.sourceforge.net/project/rhino-linux-builder/2025.4/Rhino-Linux-2025.4-amd64.iso?use_mirror=netactuate" \
 			"username=rhino hostname=rhino" \
 			"http://netactuate.dl.sourceforge.net/project/rhino-linux-builder/2025.4/Rhino-Linux-2025.4-amd64.iso" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "trisquel-mini-12" ]; then
+		ubuntu_casper_iso_setup \
+			"Trisquel Mini 12.0" \
+			"http://cdimage.trisquel.info/trisquel-images/trisquel-mini_12.0_amd64.iso" \
+			"username=trisquel hostname=trisquel" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "trisquel-netinst-12" ]; then
+		iso_boot_setup \
+			"http://cdimage.trisquel.info/trisquel-images/trisquel-netinst_12.0_amd64.iso" \
+			"Trisquel 12.0 NetInstall" \
+			"linux" \
+			"initrd.gz"
+		echo -n "vga=normal quiet " >>/tmp/nb-options
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
 	else
@@ -2137,7 +3262,7 @@ if [ $DISTRO = "devuan" ];then
 fi
 
 if [ $DISTRO = "debianlive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 16 \
+	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 18 \
 	butterbian-xfce "Butterbian Xfce 0.2.1" \
 	butterknife "Butterknife 0.1.11" \
 	bunsenlabs-carbon "BunsenLabs Carbon 1" \
@@ -2147,13 +3272,40 @@ if [ $DISTRO = "debianlive" ];then
 	minios-standard "MiniOS 5.1.1 Standard" \
 	nakedeb-16 "nakeDeb 1.6" \
 	neptune-91 "Neptune 9.1" \
+	peppermint-trixie "Peppermint OS Debian 64" \
 	refracta-xfce "Refracta 13.3 Xfce" \
 	refracta-nox "Refracta 13.3 noX" \
 	solydx-13 "SolydX 13" \
+	synex-icewm "Synex 13 IceWM" \
+	synex-lxde "Synex 13 LXDE" \
+	synex-xfce "Synex 13 Xfce" \
 	wattos-r13 "wattOS R13" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
 	debian_live_iso_setup "$VERSION" || return
+fi
+
+if [ $DISTRO = "antixmx" ];then
+	dialog --backtitle "$TITLE" --menu "Choose an antiX/MX live installer to boot:" 18 75 8 \
+	antix-26-core "antiX 26 Core" \
+	mx-25.1-xfce "MX Linux 25.1 Xfce" \
+	mx-25.1-xfce-ahs "MX Linux 25.1 Xfce AHS" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	antix_mx_iso_setup "$VERSION" || return
+fi
+
+if [ "$DISTRO" = "communitylive" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 22 78 12 \
+	pikaos-gnome "PikaOS 4.0 GNOME" \
+	pikaos-kde "PikaOS 4.0 KDE" \
+	pikaos-hyprland "PikaOS 4.0 Hyprland" \
+	pikaos-niri "PikaOS 4.0 Niri" \
+	pikaos-cosmic "PikaOS 4.0 COSMIC" \
+	solus-xfce "Solus Xfce 2026-04-18" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	community_live_iso_setup "$VERSION" || return
 fi
 
 if [ $DISTRO = "q4os" ];then
@@ -2413,6 +3565,23 @@ if [ $DISTRO = "altlinux" ];then
 	rm /tmp/nb-version
 	altlinux_iso_setup "$VERSION" || return
 fi
+if [ "$DISTRO" = "guix" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a GNU Guix System version to install:" 12 70 4 \
+	1.5.0 "GNU Guix System 1.5.0 (latest)" \
+	1.4.0 "GNU Guix System 1.4.0" \
+	1.3.0 "GNU Guix System 1.3.0" \
+	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+
+	if [ "$VERSION" = "Manual" ]; then
+		printf 'Version (e.g., 1.5.0): '
+		read -r VERSION
+		if [ -z "$VERSION" ]; then rm -f /tmp/nb-version; return 1; fi
+	fi
+
+	guix_iso_setup "$VERSION" || return
+fi
 if [ $DISTRO = "slackware" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	slackware64-current "Slackware64-current" \
@@ -2482,7 +3651,6 @@ if [ $DISTRO = "rescue" ];then
 	fi
 fi
 askforopts
-# Now download or prepare the selected boot files.
 if [ -n "${ARTIX_ISO_URL:-}" ]; then
 	if ! artix_prepare_from_iso "$ARTIX_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.* /tmp/nb-artix-overlay.cpio
@@ -2496,6 +3664,26 @@ elif [ -n "${VOID_ISO_URL:-}" ]; then
 elif [ -n "${ALTLINUX_ISO_URL:-}" ]; then
 	if ! altlinux_prepare_from_iso "$ALTLINUX_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-altlinux.iso
+		return 1
+	fi
+elif [ -n "${GUIX_ISO_URL:-}" ]; then
+	if ! guix_prepare_from_iso "$GUIX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-guix.iso
+		return 1
+	fi
+elif [ -n "${PIKA_ISO_URL:-}" ]; then
+	if ! pika_prepare_from_iso "$PIKA_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-pika.iso
+		return 1
+	fi
+elif [ -n "${ISO_BOOT_URL:-}" ]; then
+	if ! iso_boot_prepare_from_iso; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-iso-boot.iso
+		return 1
+	fi
+elif [ -n "${ANTIX_MX_ISO_URL:-}" ]; then
+	if ! antix_mx_prepare_from_iso "$ANTIX_MX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-antix-mx.iso
 		return 1
 	fi
 elif [ -n "${DEBIAN_LIVE_ISO_URL:-}" ]; then
@@ -2537,7 +3725,6 @@ fi
 }
 
 
-# Proceed with interactive menu
 while true; do
 	dialog --backtitle "$TITLE" --menu "What would you like to do?" 16 70 9 \
 	install "Install or boot a Linux system" \
@@ -2571,7 +3758,6 @@ while true; do
 		continue
 	fi
 done
-#This is what we will tell kexec.
 if [ -f /tmp/nb-initrd ]; then
 	ARGS="-l /tmp/nb-linux --initrd=/tmp/nb-initrd $OPTIONS $CUSTOM"
 else
@@ -2581,7 +3767,6 @@ fi
 if [ $DISTRO = "rhel-type-5" ];then
 	ARGS=$ARGS" --args-linux"
 fi
-# Tell Anaconda to set up an EFI System Partition when in UEFI mode.
 if [ $EFIMODE = 1 ]; then
 	case "$DISTRO" in
 		fedora64|rhel-type-*-64)
@@ -2589,7 +3774,6 @@ if [ $EFIMODE = 1 ]; then
 			;;
 	esac
 fi
-#This checks to make sure you are indeed on a TCB system.
 if [ -d /home/tc ];then
 	CMDLINE="$(cat /tmp/nb-options) $(cat /tmp/nb-custom)"
 

@@ -27,8 +27,6 @@ WORK=$(pwd)/work
 DONE=$(pwd)/done
 NBINIT=${WORK}/nbinit
 
-# Always clean up the intermediate build tree, even if the script exits early
-# due to a set -e failure.  DONE (the output directory) is intentionally kept.
 cleanup() {
     rm -rf "${WORK:-}" squashfs-root opt
     rm -f "vmlinuz64-${COREVER}" "corepure64-${COREVER}.gz" \
@@ -131,8 +129,6 @@ fetch_tcz() {
     depfile=$(mktemp)
     wget -q -T 15 "$TCX64/tcz/${pkg}.tcz.dep" -O "$depfile" 2>/dev/null || true
     if [ -s "$depfile" ]; then
-        # plain read (no IFS=) trims leading/trailing whitespace, so blank
-        # lines and whitespace-only lines become empty strings and are skipped
         while read -r dep; do
             dep="${dep%.tcz}"
             dep="${dep//KERNEL/$KVER}"   # TinyCore uses KERNEL as a placeholder
@@ -198,24 +194,20 @@ echo "Extracting corepure64..."
 gzip -cd "${FDIR}/corepure64-${COREVER}.gz" | cpio -id
 cd -
 
-# Wrapper script
 cat > "${NBINIT}/usr/bin/netboot" << "EOF"
 #!/bin/sh
-if [ $(whoami) != "root" ]; then
-	exec sudo $0 $*
+if [ "$(whoami)" != "root" ]; then
+	exec sudo "$0" "$@"
 fi
 
 if [ ! -f /tmp/internet-is-up ]; then
-	# Quick check: do we already have internet?
 	if wget --no-check-certificate --tries=1 -T 5 --spider \
 		http://www.example.com >/dev/null 2>&1; then
 		echo > /tmp/internet-is-up
 	elif command -v wpa_supplicant >/dev/null 2>&1; then
-		# WiFi ISO: let the user configure wireless from the menu
 		echo "No internet connection detected."
 		echo "Use the 'wifi' option in the menu to connect to a wireless network."
 	else
-		# Wired-only ISO: wait until a link comes up
 		echo "Waiting for internet connection (will keep trying indefinitely)"
 		echo -n "Testing example.com"
 		while ! wget --no-check-certificate --tries=1 -T 5 --spider \
