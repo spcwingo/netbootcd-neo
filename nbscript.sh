@@ -168,6 +168,28 @@ community_live_iso_setup ()
 				"boot/rootfs.xz" \
 				"rootfs.squashfs" || return
 			;;
+		puppy-bookwormpup64)
+			puppy_iso_setup \
+				"BookwormPup64 10.0.12" \
+				"https://distro.ibiblio.org/puppylinux/puppy-bookwormpup/BookwormPup64/10.0.12/BookwormPup64_10.0.12.iso" \
+				"vmlinuz" \
+				"initrd.gz" \
+				"puppy_dpupbw64_10.0.12.sfs" \
+				"zdrv_dpupbw64_10.0.12.sfs" \
+				"fdrv_dpupbw64_10.0.12.sfs" \
+				"adrv_dpupbw64_10.0.12.sfs" \
+				"bdrv_dpupbw64_10.0.12.sfs" || return
+			;;
+		easyos-excalibur)
+			easyos_img_setup \
+				"EasyOS Excalibur 7.3.3" \
+				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.3/easy-7.3.3-amd64.img" \
+				"easyos/vmlinuz" \
+				"easyos/initrd" \
+				"1.img" \
+				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
+				"easyos/" || return
+			;;
 		*)
 			nb_error "Unknown community live ISO entry: $_community_live_tag"
 			return 1
@@ -298,6 +320,16 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="http://ftp.nluug.nl/os/Linux/distr/solydxk/downloads/solydx_13_64_202512.iso"
 			DEBIAN_LIVE_OPTIONS="username=solydxk hostname=solydx"
 			;;
+		sparky-lxqt-83)
+			DEBIAN_LIVE_LABEL="SparkyLinux 8.3 LXQt"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/sparkylinux/lxqt/sparkylinux-8.3-x86_64-lxqt.iso"
+			DEBIAN_LIVE_OPTIONS="username=live hostname=sparky"
+			;;
+		sparky-xfce-831)
+			DEBIAN_LIVE_LABEL="SparkyLinux 8.3.1 Xfce"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/sparkylinux/xfce/sparkylinux-8.3.1-x86_64-xfce.iso"
+			DEBIAN_LIVE_OPTIONS="username=live hostname=sparky"
+			;;
 		synex-icewm)
 			DEBIAN_LIVE_LABEL="Synex 13 IceWM"
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/synex/Stable/ICEWM/synex-icewm-13-u8-amd64.hybrid.iso"
@@ -312,6 +344,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="Synex 13 Xfce"
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/synex/Stable/XFCE/synex-xfce-13-u8-amd64.hybrid.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=synex"
+			;;
+		voyager-debian-133)
+			DEBIAN_LIVE_LABEL="Voyager 13.3 Debian"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/voyagerlive/Voyager-13.3-debian-amd64.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=voyager"
 			;;
 		wattos-r13)
 			DEBIAN_LIVE_LABEL="wattOS R13"
@@ -1513,6 +1550,561 @@ mocaccino_prepare_from_iso ()
 	rm -f "$_mocaccino_iso" "$_mocaccino_rootfs" /tmp/nb-mocaccino-7z.log /tmp/nb-mocaccino-mount.log
 	[ -n "$_mocaccino_mounted" ] && umount "$_mocaccino_work" 2>/dev/null || true
 	rm -rf "$_mocaccino_work"
+	return 0
+}
+
+puppy_iso_setup ()
+{
+	PUPPY_LABEL="$1"
+	PUPPY_ISO_URL="$2"
+	PUPPY_KERNEL_PATH="$3"
+	PUPPY_INITRD_PATH="$4"
+	shift 4
+	PUPPY_SFS_PATHS="$*"
+	echo -n "pfix=ram,fsck pmedia=cd net.ifnames=0 " >>/tmp/nb-options
+}
+
+puppy_repack_initrd_with_sfs ()
+{
+	_puppy_work="/tmp/nb-puppy-work/initrd-work"
+	_puppy_repacked="/tmp/nb-puppy-work/nb-initrd.puppy"
+	_puppy_new="/tmp/nb-puppy-work/nb-initrd.new"
+
+	if ! _puppy_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $PUPPY_LABEL initrd compression format."
+		return 1
+	fi
+	_puppy_format="${_puppy_main_info%% *}"
+	_puppy_main_offset="${_puppy_main_info#* }"
+
+	if [ "$_puppy_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$PUPPY_LABEL initrd uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_puppy_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$PUPPY_LABEL initrd uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
+	mkdir -p "$_puppy_work"
+
+	case "$_puppy_format" in
+		gzip)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL gzip initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL zstd initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL xz initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL cpio initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+	esac
+
+	for _puppy_sfs in "$@"; do
+		if [ ! -s "$_puppy_sfs" ]; then
+			nb_error "Could not find an extracted $PUPPY_LABEL SFS file: $_puppy_sfs"
+			rm -rf "$_puppy_work"
+			return 1
+		fi
+		_puppy_sfs_file="${_puppy_sfs##*/}"
+		if ! mv "$_puppy_sfs" "$_puppy_work/$_puppy_sfs_file"; then
+			nb_error "Could not embed $_puppy_sfs_file into the $PUPPY_LABEL initrd."
+			rm -rf "$_puppy_work"
+			return 1
+		fi
+	done
+
+	if [ -f "$_puppy_work/init" ] && ! grep -q 'netbootcd_puppy_tmpfs_sfs' "$_puppy_work/init"; then
+		if ! sed '/^stack_onepupdrv() {/,/^copy_onepupdrv() {/{
+/^ ONE_BASENAME="$(basename $ONE_REL_FN)"$/a\
+ # netbootcd_puppy_tmpfs_sfs\
+ if [ ! -s "$ONE_FN" ] && [ -f "/mnt/tmpfs/$ONE_BASENAME" ]; then\
+  ONE_FN="/mnt/tmpfs/$ONE_BASENAME"\
+ fi
+}' "$_puppy_work/init" >"$_puppy_work/init.new"; then
+			nb_error "Could not patch the $PUPPY_LABEL humongous-initrd loader."
+			rm -rf "$_puppy_work" "$_puppy_work/init.new"
+			return 1
+		fi
+		mv "$_puppy_work/init.new" "$_puppy_work/init"
+		chmod 755 "$_puppy_work/init"
+	fi
+
+	case "$_puppy_format" in
+		gzip)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | gzip -1 -c >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL gzip initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | zstd -q -c >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL zstd initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL xz initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL cpio initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >"$_puppy_new"
+	if [ "$_puppy_main_offset" -gt 0 ]; then
+		if ! head -c "$_puppy_main_offset" /tmp/nb-initrd >>"$_puppy_new"; then
+			nb_error "Could not preserve the $PUPPY_LABEL early initrd prefix."
+			rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_puppy_repacked" >>"$_puppy_new"; then
+		nb_error "Could not write the repacked $PUPPY_LABEL initrd."
+		rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
+		return 1
+	fi
+
+	mv "$_puppy_new" /tmp/nb-initrd
+	rm -rf "$_puppy_work" "$_puppy_repacked"
+	return 0
+}
+
+puppy_prepare_from_iso ()
+{
+	_puppy_iso_url="$1"
+	_puppy_work="/tmp/nb-puppy-work"
+	_puppy_iso="$_puppy_work/nb-puppy.iso"
+	_puppy_boot="$_puppy_work/boot"
+	_puppy_sfs_dir="$_puppy_work/sfs"
+
+	if ! _puppy_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $PUPPY_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_puppy_work " /proc/mounts 2>/dev/null; then
+		umount "$_puppy_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_puppy_work" /tmp/nb-initrd.puppy /tmp/nb-initrd.new
+	mkdir -p "$_puppy_boot" "$_puppy_sfs_dir"
+	_puppy_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_puppy_work" 2>/tmp/nb-puppy-mount.log; then
+		_puppy_mounted=1
+		mkdir -p "$_puppy_boot" "$_puppy_sfs_dir"
+	fi
+
+	if ! wgetgauge "$_puppy_iso_url" "$_puppy_iso" "Downloading $PUPPY_LABEL ISO"; then
+		nb_error "Could not download $PUPPY_LABEL ISO from:\n\n$_puppy_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		return 1
+	fi
+
+	if ! "$_puppy_7z" e -y -o"$_puppy_boot" "$_puppy_iso" "$PUPPY_KERNEL_PATH" "$PUPPY_INITRD_PATH" >/tmp/nb-puppy-7z.log 2>&1; then
+		nb_error "Could not extract $PUPPY_LABEL boot files from the ISO.\nSee /tmp/nb-puppy-7z.log for details."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		return 1
+	fi
+	_puppy_kernel_file="${PUPPY_KERNEL_PATH##*/}"
+	_puppy_initrd_file="${PUPPY_INITRD_PATH##*/}"
+	if [ ! -s "$_puppy_boot/$_puppy_kernel_file" ] || [ ! -s "$_puppy_boot/$_puppy_initrd_file" ]; then
+		nb_error "The $PUPPY_LABEL ISO did not contain its expected kernel and initrd."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		return 1
+	fi
+	mv "$_puppy_boot/$_puppy_kernel_file" /tmp/nb-linux
+	mv "$_puppy_boot/$_puppy_initrd_file" /tmp/nb-initrd
+	rm -rf "$_puppy_boot"
+
+	_puppy_sfs_files=
+	for _puppy_sfs_path in $PUPPY_SFS_PATHS; do
+		if ! "$_puppy_7z" e -y -o"$_puppy_sfs_dir" "$_puppy_iso" "$_puppy_sfs_path" >>/tmp/nb-puppy-7z.log 2>&1; then
+			nb_error "Could not extract $_puppy_sfs_path from the $PUPPY_LABEL ISO.\nSee /tmp/nb-puppy-7z.log for details."
+			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+			rm -rf "$_puppy_work"
+			rm -f /tmp/nb-linux /tmp/nb-initrd
+			return 1
+		fi
+		_puppy_sfs_file="${_puppy_sfs_path##*/}"
+		if [ ! -s "$_puppy_sfs_dir/$_puppy_sfs_file" ]; then
+			nb_error "The $PUPPY_LABEL ISO did not contain $_puppy_sfs_path."
+			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+			rm -rf "$_puppy_work"
+			rm -f /tmp/nb-linux /tmp/nb-initrd
+			return 1
+		fi
+		_puppy_sfs_files="$_puppy_sfs_files $_puppy_sfs_dir/$_puppy_sfs_file"
+	done
+
+	if [ -z "$_puppy_sfs_files" ]; then
+		nb_error "No $PUPPY_LABEL SFS files were selected for embedding."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	rm -f "$_puppy_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $PUPPY_LABEL SFS files into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! puppy_repack_initrd_with_sfs $_puppy_sfs_files; then
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f "$_puppy_iso" /tmp/nb-puppy-7z.log /tmp/nb-puppy-mount.log
+	[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+	rm -rf "$_puppy_work"
+	return 0
+}
+
+easyos_img_setup ()
+{
+	EASYOS_LABEL="$1"
+	EASYOS_IMG_URL="$2"
+	EASYOS_KERNEL_PATH="$3"
+	EASYOS_INITRD_PATH="$4"
+	EASYOS_WKG_IMAGE_PATH="$5"
+	EASYOS_WKG_UUID="$6"
+	EASYOS_WKG_DIR="$7"
+	echo -n "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
+}
+
+easyos_repack_initrd_with_wkg_image ()
+{
+	_easyos_wkg_image="$1"
+	_easyos_work="/tmp/nb-easyos-work/initrd-work"
+	_easyos_repacked="/tmp/nb-easyos-work/nb-initrd.easyos"
+	_easyos_new="/tmp/nb-easyos-work/nb-initrd.new"
+
+	if ! _easyos_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $EASYOS_LABEL initrd compression format."
+		return 1
+	fi
+	_easyos_format="${_easyos_main_info%% *}"
+	_easyos_main_offset="${_easyos_main_info#* }"
+
+	if [ "$_easyos_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$EASYOS_LABEL initrd uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_easyos_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$EASYOS_LABEL initrd uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_easyos_work" "$_easyos_repacked" "$_easyos_new"
+	mkdir -p "$_easyos_work"
+
+	case "$_easyos_format" in
+		gzip)
+			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_easyos_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $EASYOS_LABEL gzip initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_easyos_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $EASYOS_LABEL zstd initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_easyos_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $EASYOS_LABEL xz initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_easyos_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $EASYOS_LABEL cpio initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+	esac
+
+	if ! mv "$_easyos_wkg_image" "$_easyos_work/netbootcd-easyos-wkg.img"; then
+		nb_error "Could not embed the $EASYOS_LABEL working image."
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+
+	mkdir -p "$_easyos_work/sbin"
+	cat >"$_easyos_work/sbin/netbootcd_easyos_loop" <<'EOF'
+#!/bin/sh
+PATH=/bin:/sbin
+export PATH
+
+EASYOS_IMAGE=/netbootcd-easyos-wkg.img
+
+netbootcd_easyos_log()
+{
+	echo "NetbootCD-Neo: $*" >/dev/console 2>/dev/null || true
+}
+
+netbootcd_easyos_grow_image()
+{
+	EASYOS_GROW_MB=2048
+	if command -v truncate >/dev/null 2>&1 && command -v stat >/dev/null 2>&1; then
+		EASYOS_SIZE="$(stat -c %s "$EASYOS_IMAGE" 2>/dev/null || echo 0)"
+		case "$EASYOS_SIZE" in
+			''|*[!0-9]*) EASYOS_SIZE=0 ;;
+		esac
+		if [ "$EASYOS_SIZE" -gt 0 ]; then
+			EASYOS_NEW_SIZE=$(( EASYOS_SIZE + EASYOS_GROW_MB * 1024 * 1024 ))
+			if truncate -s "$EASYOS_NEW_SIZE" "$EASYOS_IMAGE" 2>/dev/null; then
+				netbootcd_easyos_log "expanded embedded EasyOS working image by ${EASYOS_GROW_MB}M"
+				return 0
+			fi
+		fi
+	fi
+	netbootcd_easyos_log "could not expand embedded EasyOS working image"
+	return 0
+}
+
+netbootcd_easyos_resize_loop()
+{
+	EASYOS_RESIZE_LOOP="$1"
+	if command -v e2fsck >/dev/null 2>&1 && command -v resize2fs >/dev/null 2>&1; then
+		e2fsck -fy "$EASYOS_RESIZE_LOOP" >/dev/console 2>&1 || true
+		resize2fs "$EASYOS_RESIZE_LOOP" >/dev/console 2>&1 || true
+	fi
+}
+
+[ -f "$EASYOS_IMAGE" ] || exit 0
+netbootcd_easyos_grow_image
+[ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237 2>/dev/null || true
+for EASYOS_LOOP_NR in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+	[ -e "/dev/loop$EASYOS_LOOP_NR" ] || mknod "/dev/loop$EASYOS_LOOP_NR" b 7 "$EASYOS_LOOP_NR" 2>/dev/null || true
+done
+
+modprobe loop 2>/dev/null || true
+
+EASYOS_LOOP_DEVICE="$(losetup -f 2>/dev/null || true)"
+if [ -n "$EASYOS_LOOP_DEVICE" ] && losetup "$EASYOS_LOOP_DEVICE" "$EASYOS_IMAGE" 2>/dev/null; then
+	netbootcd_easyos_log "attached embedded EasyOS working image to $EASYOS_LOOP_DEVICE"
+	netbootcd_easyos_resize_loop "$EASYOS_LOOP_DEVICE"
+	blkid "$EASYOS_LOOP_DEVICE" >/dev/console 2>/dev/null || true
+	exit 0
+fi
+
+for EASYOS_LOOP_DEVICE in /dev/loop0 /dev/loop1 /dev/loop2 /dev/loop3 /dev/loop4 /dev/loop5 /dev/loop6 /dev/loop7 /dev/loop8 /dev/loop9 /dev/loop10 /dev/loop11 /dev/loop12 /dev/loop13 /dev/loop14 /dev/loop15; do
+	if losetup "$EASYOS_LOOP_DEVICE" "$EASYOS_IMAGE" 2>/dev/null; then
+		netbootcd_easyos_log "attached embedded EasyOS working image to $EASYOS_LOOP_DEVICE"
+		netbootcd_easyos_resize_loop "$EASYOS_LOOP_DEVICE"
+		blkid "$EASYOS_LOOP_DEVICE" >/dev/console 2>/dev/null || true
+		exit 0
+	fi
+done
+
+netbootcd_easyos_log "could not attach embedded EasyOS working image"
+exit 0
+EOF
+	chmod 755 "$_easyos_work/sbin/netbootcd_easyos_loop"
+
+	if [ -f "$_easyos_work/init" ] && ! grep -q 'netbootcd_easyos_loop' "$_easyos_work/init"; then
+		if ! sed '/^mount -t devtmpfs devtmpfs \/dev$/a\
+/sbin/netbootcd_easyos_loop || true
+' "$_easyos_work/init" >"$_easyos_work/init.new"; then
+			nb_error "Could not add the $EASYOS_LABEL loop hook to initrd init."
+			rm -rf "$_easyos_work" "$_easyos_work/init.new"
+			return 1
+		fi
+		mv "$_easyos_work/init.new" "$_easyos_work/init"
+
+		if ! sed '/^\[ \$Pw -eq 1 \] && WKG_DRV=/a\
+case "$WKG_DEV" in\
+ loop*) WKG_DRV="$WKG_DEV" ;;\
+esac
+' "$_easyos_work/init" >"$_easyos_work/init.new"; then
+			nb_error "Could not patch the $EASYOS_LABEL working-drive detection."
+			rm -rf "$_easyos_work" "$_easyos_work/init.new"
+			return 1
+		fi
+		mv "$_easyos_work/init.new" "$_easyos_work/init"
+		chmod 755 "$_easyos_work/init"
+	fi
+
+	if [ -f "$_easyos_work/inc/01resize-wkg" ] && ! grep -q 'netbootcd_easyos_skip_loop_resize' "$_easyos_work/inc/01resize-wkg"; then
+		if ! sed '1a\
+# netbootcd_easyos_skip_loop_resize\
+case "$WKG_DEV" in\
+ loop*) return 0 ;;\
+esac
+' "$_easyos_work/inc/01resize-wkg" >"$_easyos_work/inc/01resize-wkg.new"; then
+			nb_error "Could not patch the $EASYOS_LABEL resize helper."
+			rm -rf "$_easyos_work" "$_easyos_work/inc/01resize-wkg.new"
+			return 1
+		fi
+		mv "$_easyos_work/inc/01resize-wkg.new" "$_easyos_work/inc/01resize-wkg"
+	fi
+
+	case "$_easyos_format" in
+		gzip)
+			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc | gzip -1 -c >"$_easyos_repacked" ); then
+				nb_error "Could not repack the $EASYOS_LABEL gzip initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc | zstd -q -c >"$_easyos_repacked" ); then
+				nb_error "Could not repack the $EASYOS_LABEL zstd initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_easyos_repacked" ); then
+				nb_error "Could not repack the $EASYOS_LABEL xz initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc >"$_easyos_repacked" ); then
+				nb_error "Could not repack the $EASYOS_LABEL cpio initrd."
+				rm -rf "$_easyos_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >"$_easyos_new"
+	if [ "$_easyos_main_offset" -gt 0 ]; then
+		if ! head -c "$_easyos_main_offset" /tmp/nb-initrd >>"$_easyos_new"; then
+			nb_error "Could not preserve the $EASYOS_LABEL early initrd prefix."
+			rm -rf "$_easyos_work" "$_easyos_repacked" "$_easyos_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_easyos_repacked" >>"$_easyos_new"; then
+		nb_error "Could not write the repacked $EASYOS_LABEL initrd."
+		rm -rf "$_easyos_work" "$_easyos_repacked" "$_easyos_new"
+		return 1
+	fi
+
+	mv "$_easyos_new" /tmp/nb-initrd
+	rm -rf "$_easyos_work" "$_easyos_repacked"
+	return 0
+}
+
+easyos_prepare_from_img ()
+{
+	_easyos_img_url="$1"
+	_easyos_work="/tmp/nb-easyos-work"
+	_easyos_img="$_easyos_work/nb-easyos.img"
+	_easyos_boot="$_easyos_work/boot"
+	_easyos_wkg_image="$_easyos_work/${EASYOS_WKG_IMAGE_PATH##*/}"
+
+	if ! _easyos_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $EASYOS_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_easyos_work " /proc/mounts 2>/dev/null; then
+		umount "$_easyos_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_easyos_work" /tmp/nb-initrd.easyos /tmp/nb-initrd.new
+	mkdir -p "$_easyos_boot"
+	_easyos_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_easyos_work" 2>/tmp/nb-easyos-mount.log; then
+		_easyos_mounted=1
+		mkdir -p "$_easyos_boot"
+	fi
+
+	if ! wgetgauge "$_easyos_img_url" "$_easyos_img" "Downloading $EASYOS_LABEL disk image"; then
+		nb_error "Could not download $EASYOS_LABEL disk image from:\n\n$_easyos_img_url\n\nThis entry needs enough RAM to hold and repack the working image."
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+
+	if ! "$_easyos_7z" e -y -o"$_easyos_work" "$_easyos_img" "$EASYOS_WKG_IMAGE_PATH" >/tmp/nb-easyos-7z.log 2>&1; then
+		nb_error "Could not extract the $EASYOS_LABEL working image from the disk image.\nSee /tmp/nb-easyos-7z.log for details."
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+	if [ ! -s "$_easyos_wkg_image" ]; then
+		nb_error "The $EASYOS_LABEL disk image did not contain $EASYOS_WKG_IMAGE_PATH."
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+	rm -f "$_easyos_img"
+
+	if ! "$_easyos_7z" e -y -o"$_easyos_boot" "$_easyos_wkg_image" "$EASYOS_KERNEL_PATH" "$EASYOS_INITRD_PATH" >>/tmp/nb-easyos-7z.log 2>&1; then
+		nb_error "Could not extract $EASYOS_LABEL boot files from the working image.\nSee /tmp/nb-easyos-7z.log for details."
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+	_easyos_kernel_file="${EASYOS_KERNEL_PATH##*/}"
+	_easyos_initrd_file="${EASYOS_INITRD_PATH##*/}"
+	if [ ! -s "$_easyos_boot/$_easyos_kernel_file" ] || [ ! -s "$_easyos_boot/$_easyos_initrd_file" ]; then
+		nb_error "The $EASYOS_LABEL working image did not contain its expected kernel and initrd."
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+	mv "$_easyos_boot/$_easyos_kernel_file" /tmp/nb-linux
+	mv "$_easyos_boot/$_easyos_initrd_file" /tmp/nb-initrd
+	rm -rf "$_easyos_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $EASYOS_LABEL working image into the initrd.\n\nThis is a large payload and can take a while." 7 70 || true
+	if ! easyos_repack_initrd_with_wkg_image "$_easyos_wkg_image"; then
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f "$_easyos_img" /tmp/nb-easyos-7z.log /tmp/nb-easyos-mount.log
+	[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+	rm -rf "$_easyos_work"
 	return 0
 }
 
@@ -3538,6 +4130,18 @@ PIKA_ISO_URL=
 PIKA_LABEL=
 PIKA_ISO_FILE=
 PIKA_ISO_VOLUME=
+PUPPY_ISO_URL=
+PUPPY_LABEL=
+PUPPY_KERNEL_PATH=
+PUPPY_INITRD_PATH=
+PUPPY_SFS_PATHS=
+EASYOS_IMG_URL=
+EASYOS_LABEL=
+EASYOS_KERNEL_PATH=
+EASYOS_INITRD_PATH=
+EASYOS_WKG_IMAGE_PATH=
+EASYOS_WKG_UUID=
+EASYOS_WKG_DIR=
 ARCHISO_ISO_URL=
 ARCHISO_LABEL=
 ARCHISO_KERNEL_PATH=
@@ -3638,7 +4242,7 @@ if [ $DISTRO = "ubuntu" ];then
 fi
 if [ $DISTRO = "ubuntuflavor" ];then
 	UBUNTU_LIVE_CUSTOM=
-	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 24 78 17 \
+	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 24 78 18 \
 	kubuntu-26.04 "Kubuntu 26.04 LTS" \
 	xubuntu-26.04 "Xubuntu 26.04 LTS" \
 	lubuntu-26.04 "Lubuntu 26.04 LTS" \
@@ -3654,6 +4258,7 @@ if [ $DISTRO = "ubuntuflavor" ];then
 		rhino-2025.4 "Rhino Linux 2025.4" \
 	trisquel-mini-12 "Trisquel Mini 12.0" \
 	trisquel-netinst-12 "Trisquel 12.0 NetInstall" \
+	voyager-26.04 "Voyager 26.04 LTS" \
 	Manual "Manually enter an Ubuntu live ISO URL" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
@@ -3723,6 +4328,13 @@ if [ $DISTRO = "ubuntuflavor" ];then
 		echo -n "vga=normal quiet " >>/tmp/nb-options
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
+	elif [ "$VERSION" = "voyager-26.04" ]; then
+		ubuntu_casper_iso_setup \
+			"Voyager 26.04 LTS" \
+			"http://downloads.sourceforge.net/project/voyagerlive/Voyager-26.04-lts-amd64.iso" \
+			"username=ubuntu hostname=voyager" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
 	else
 		ISODEFAULT=
 	fi
@@ -3783,7 +4395,7 @@ if [ $DISTRO = "devuan" ];then
 fi
 
 if [ $DISTRO = "debianlive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 19 \
+	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 22 \
 	besgnulinux-jwm "Besgnulinux JWM 3.3" \
 	butterbian-xfce "Butterbian Xfce 0.2.1" \
 	butterknife "Butterknife 0.1.11" \
@@ -3798,9 +4410,12 @@ if [ $DISTRO = "debianlive" ];then
 	refracta-xfce "Refracta 13.3 Xfce" \
 	refracta-nox "Refracta 13.3 noX" \
 	solydx-13 "SolydX 13" \
+	sparky-lxqt-83 "SparkyLinux 8.3 LXQt" \
+	sparky-xfce-831 "SparkyLinux 8.3.1 Xfce" \
 	synex-icewm "Synex 13 IceWM" \
 	synex-lxde "Synex 13 LXDE" \
 	synex-xfce "Synex 13 Xfce" \
+	voyager-debian-133 "Voyager 13.3 Debian" \
 	wattos-r13 "wattOS R13" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
@@ -3819,12 +4434,14 @@ fi
 
 if [ "$DISTRO" = "communitylive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 22 78 12 \
+	easyos-excalibur "EasyOS Excalibur 7.3.3" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
 	pikaos-niri "PikaOS 4.0 Niri" \
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
+	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	solus-xfce "Solus Xfce 2026-04-18" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
@@ -4207,6 +4824,16 @@ elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
 elif [ -n "${PIKA_ISO_URL:-}" ]; then
 	if ! pika_prepare_from_iso "$PIKA_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-pika.iso
+		return 1
+	fi
+elif [ -n "${PUPPY_ISO_URL:-}" ]; then
+	if ! puppy_prepare_from_iso "$PUPPY_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-puppy.iso
+		return 1
+	fi
+elif [ -n "${EASYOS_IMG_URL:-}" ]; then
+	if ! easyos_prepare_from_img "$EASYOS_IMG_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-easyos.img
 		return 1
 	fi
 elif [ -n "${ISO_BOOT_URL:-}" ]; then
