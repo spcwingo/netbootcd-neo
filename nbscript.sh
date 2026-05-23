@@ -89,6 +89,8 @@ ubuntu_casper_iso_setup ()
 	DEBIAN_LIVE_MODE=casper-url
 	DEBIAN_LIVE_KERNEL_PATHS="casper/vmlinuz casper/vmlinuz.efi live/vmlinuz boot/vmlinuz boot/vmlinuz-*"
 	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst"
+	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
+	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
 	echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
 }
 
@@ -102,7 +104,24 @@ dracut_live_iso_setup ()
 	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img isolinux/initrd.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="LiveOS/squashfs.img"
+	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
+	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
 	echo -n "root=live:/LiveOS/squashfs.img ro rd.live.image rd.live.overlay.overlayfs=1 rd.luks=0 rd.md=0 rd.dm=0 $3 " >>/tmp/nb-options
+}
+
+adelie_iso_setup ()
+{
+	DEBIAN_LIVE_LABEL="Adelie Linux 1.0-beta6 Installer"
+	DEBIAN_LIVE_ISO_URL="https://distfiles.adelielinux.org/adelie/1.0-beta6/iso/adelie-inst-x86_64-1.0-beta6-20241223.iso"
+	DEBIAN_LIVE_BOOT_URL="$DEBIAN_LIVE_ISO_URL"
+	DEBIAN_LIVE_MODE=embed
+	DEBIAN_LIVE_KERNEL_PATHS="kernel-x86_64"
+	DEBIAN_LIVE_INITRD_PATHS="initrd-x86_64"
+	DEBIAN_LIVE_ROOTFS_PATHS="x86_64.squashfs"
+	DEBIAN_LIVE_EMBED_ROOTFS_PATH="x86_64.img"
+	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
+	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
+	echo -n "root=live:/x86_64.img ro rd.live.overlay.overlayfs=1 softlevel=graphical " >>/tmp/nb-options
 }
 
 pika_iso_setup ()
@@ -114,11 +133,41 @@ pika_iso_setup ()
 	echo -n "VTOY_ISO_NAME=$PIKA_ISO_FILE ISO_LABEL_NAME=\"$PIKA_ISO_VOLUME\" boot=live booster.loadcdrom booster.skiproot " >>/tmp/nb-options
 }
 
+porteux_iso_setup ()
+{
+	PORTEUX_LABEL="$1"
+	PORTEUX_ISO_URL="$2"
+	PORTEUX_KERNEL_PATH="$3"
+	PORTEUX_INITRD_PATH="$4"
+	echo -n "$5 " >>/tmp/nb-options
+}
+
+chimera_iso_setup ()
+{
+	CHIMERA_LABEL="$1"
+	CHIMERA_ISO_URL="$2"
+	CHIMERA_KERNEL_PATH="$3"
+	CHIMERA_INITRD_PATH="$4"
+	echo -n "boot=live live-media=CHIMERA_LIVE fromiso=/.netbootcd/chimera.iso dinit_skip_volumes init=/usr/bin/init loglevel=4 " >>/tmp/nb-options
+}
+
+coyote_iso_setup ()
+{
+	COYOTE_LABEL="$1"
+	COYOTE_ISO_URL="$2"
+	COYOTE_KERNEL_PATH="$3"
+	COYOTE_INITRD_PATH="$4"
+	echo -n "console=tty0 quiet installer " >>/tmp/nb-options
+}
+
 community_live_iso_setup ()
 {
 	_community_live_tag="$1"
 
 	case "$_community_live_tag" in
+		adelie-inst-beta6)
+			adelie_iso_setup || return
+			;;
 		pikaos-gnome)
 			pika_iso_setup \
 				"PikaOS GNOME 4.0" \
@@ -190,6 +239,28 @@ community_live_iso_setup ()
 				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
 				"easyos/" || return
 			;;
+		porteux-lxde)
+			porteux_iso_setup \
+				"PorteuX 2.4 LXDE" \
+				"https://github.com/porteux/porteux/releases/download/v2.4/porteux-2.4-current-lxde-0.11.1-x86_64.iso" \
+				"boot/syslinux/vmlinuz" \
+				"boot/syslinux/initrd.zst" \
+				"kvm.enable_virt_at_load=0" || return
+			;;
+		chimera-base)
+			chimera_iso_setup \
+				"Chimera Linux Base 2025-12-20" \
+				"https://repo.chimera-linux.org/live/latest/chimera-linux-x86_64-LIVE-20251220-base.iso" \
+				"live/vmlinuz" \
+				"live/initrd" || return
+			;;
+		coyote-installer-40192)
+			coyote_iso_setup \
+				"Coyote Linux 4.0.192 Technology Preview" \
+				"https://www.coyotelinux.com/files/coyote/coyote-installer-4.0.192.iso" \
+				"boot/vmlinuz" \
+				"boot/initramfs.gz" || return
+			;;
 		*)
 			nb_error "Unknown community live ISO entry: $_community_live_tag"
 			return 1
@@ -244,6 +315,8 @@ debian_live_iso_setup ()
 	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
+	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
+	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
 
 	case "$_debian_live_tag" in
 		butterbian-xfce)
@@ -260,6 +333,21 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="BunsenLabs Carbon 1"
 			DEBIAN_LIVE_ISO_URL="http://ddl.bunsenlabs.org/ddl/carbon-1-260211-amd64.hybrid.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=bunsenlabs"
+			;;
+		crowz-openbox)
+			DEBIAN_LIVE_LABEL="CROWZ 5.0.1 Openbox"
+			DEBIAN_LIVE_ISO_URL="http://netactuate.dl.sourceforge.net/project/crowz/crowz-5.0.1-daedalus_2024.02-ob-amd64.iso?viasf=1&fid=c2b2d7d6505e5406"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=crowz"
+			;;
+		crowz-fluxbox)
+			DEBIAN_LIVE_LABEL="CROWZ 5.0.1 Fluxbox"
+			DEBIAN_LIVE_ISO_URL="http://cytranet.dl.sourceforge.net/project/crowz/crowz-5.0.1-daedalus_2024.02-fb-amd64.iso?viasf=1"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=crowz"
+			;;
+		crowz-jwm)
+			DEBIAN_LIVE_LABEL="CROWZ 5.0.1 JWM"
+			DEBIAN_LIVE_ISO_URL="http://cytranet.dl.sourceforge.net/project/crowz/crowz-5.0.1-daedalus_2024.02-jwm-amd64.iso?viasf=1&fid=9a1c076617cbd21c"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=crowz"
 			;;
 		besgnulinux-jwm)
 			DEBIAN_LIVE_LABEL="Besgnulinux JWM 3.3"
@@ -363,6 +451,12 @@ debian_live_iso_setup ()
 
 	[ -n "$DEBIAN_LIVE_BOOT_URL" ] || DEBIAN_LIVE_BOOT_URL="$DEBIAN_LIVE_ISO_URL"
 	case "$_debian_live_tag" in
+		crowz-*)
+			DEBIAN_LIVE_MODE=embed
+			if [ "$EFIMODE" = 1 ]; then
+				DEBIAN_LIVE_OPTIONS="$DEBIAN_LIVE_OPTIONS modprobe.blacklist=video module_blacklist=video"
+			fi
+			;;
 		refracta-*)
 			DEBIAN_LIVE_MODE=embed
 			;;
@@ -484,7 +578,28 @@ debian_live_repack_initrd_with_rootfs ()
 		rm -rf "$_debian_live_work"
 		return 1
 	fi
-
+	if [ -n "${DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH:-}" ]; then
+		_debian_live_alias="$_debian_live_work/$DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH"
+		_debian_live_alias_dir="${_debian_live_alias%/*}"
+		_debian_live_alias_target="../$DEBIAN_LIVE_EMBED_ROOTFS_PATH"
+		mkdir -p "$_debian_live_alias_dir"
+		if ! ln -s "$_debian_live_alias_target" "$_debian_live_alias"; then
+			nb_error "Could not add the $DEBIAN_LIVE_LABEL live filesystem alias to the initramfs."
+			rm -rf "$_debian_live_work"
+			return 1
+		fi
+	fi
+	for _debian_live_extra_path in ${DEBIAN_LIVE_EXTRA_ROOTFS_PATHS:-}; do
+		_debian_live_extra_src="$_debian_live_parent/$_debian_live_extra_path"
+		_debian_live_extra_dest="$_debian_live_work/$_debian_live_extra_path"
+		_debian_live_extra_dest_dir="${_debian_live_extra_dest%/*}"
+		mkdir -p "$_debian_live_extra_dest_dir"
+		if ! mv "$_debian_live_extra_src" "$_debian_live_extra_dest"; then
+			nb_error "Could not add $_debian_live_extra_path from the $DEBIAN_LIVE_LABEL ISO to the initramfs."
+			rm -rf "$_debian_live_work"
+			return 1
+		fi
+	done
 	case "$_debian_live_format" in
 		gzip)
 			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | gzip -1 -c >"$_debian_live_repacked" ); then
@@ -776,6 +891,17 @@ debian_live_prepare_from_iso ()
 		rm -f /tmp/nb-linux /tmp/nb-initrd
 		return 1
 	fi
+	for _debian_live_extra_path in ${DEBIAN_LIVE_EXTRA_ROOTFS_PATHS:-}; do
+		_debian_live_extra_out="$_debian_live_mount_dir/$_debian_live_extra_path"
+		_debian_live_extra_out_dir="${_debian_live_extra_out%/*}"
+		mkdir -p "$_debian_live_extra_out_dir"
+		if ! debian_live_extract_boot_file "$_debian_live_iso" "$_debian_live_extra_out" "live filesystem layer $_debian_live_extra_path" "$_debian_live_extra_path"; then
+			[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
+			rm -rf "$_debian_live_mount_dir"
+			rm -f /tmp/nb-linux /tmp/nb-initrd
+			return 1
+		fi
+	done
 	rm -f "$_debian_live_iso"
 
 	dialog --backtitle "$TITLE" --infobox \
@@ -1053,6 +1179,482 @@ pika_prepare_from_iso ()
 	fi
 
 	rm -f "$_pika_boot_image" /tmp/nb-pika-7z.log /tmp/nb-pika-mount.log
+	return 0
+}
+
+porteux_repack_initrd_with_iso ()
+{
+	_porteux_iso="$1"
+	_porteux_parent="${_porteux_iso%/*}"
+	_porteux_tree="$_porteux_parent/initrd-work"
+	_porteux_repacked="$_porteux_parent/nb-initrd.repacked"
+	_porteux_final="$_porteux_parent/nb-initrd"
+
+	if ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$PORTEUX_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+
+	rm -rf "$_porteux_tree" "$_porteux_repacked" "$_porteux_final"
+	mkdir -p "$_porteux_tree"
+	if ! ( zstd -dc /tmp/nb-initrd | ( cd "$_porteux_tree" && cpio -idmu ) ) 2>/tmp/nb-porteux-cpio.log; then
+		nb_error "Could not unpack the $PORTEUX_LABEL initramfs.\nSee /tmp/nb-porteux-cpio.log for details."
+		rm -rf "$_porteux_tree"
+		return 1
+	fi
+	if [ ! -L "$_porteux_tree/init" ] || [ ! -s "$_porteux_tree/linuxrc" ]; then
+		nb_error "Could not find the $PORTEUX_LABEL initramfs startup scripts."
+		rm -rf "$_porteux_tree"
+		return 1
+	fi
+
+	mkdir -p "$_porteux_tree/netbootcd"
+	if ! mv "$_porteux_iso" "$_porteux_tree/netbootcd/porteux.iso"; then
+		nb_error "Could not embed the $PORTEUX_LABEL ISO into the initramfs."
+		rm -rf "$_porteux_tree"
+		return 1
+	fi
+
+	if ! awk '
+		$0 == "if [ $ISO ]; then" && !patched {
+			print "if [ -f /netbootcd/porteux.iso ]; then"
+			print "\tCFGDEV=/mnt/isoloop"
+			print "\tISOSRC=/netbootcd/porteux.iso"
+			print "\tmkdir -p \"$CFGDEV\""
+			print "\tmount -o loop \"$ISOSRC\" \"$CFGDEV\""
+			print "elif [ $ISO ]; then"
+			patched=1
+			next
+		}
+		{ print }
+		END { if (!patched) exit 1 }
+	' "$_porteux_tree/linuxrc" >"$_porteux_tree/linuxrc.new"; then
+		nb_error "Could not patch the $PORTEUX_LABEL initramfs media search."
+		rm -rf "$_porteux_tree"
+		return 1
+	fi
+	mv "$_porteux_tree/linuxrc.new" "$_porteux_tree/linuxrc"
+	chmod 755 "$_porteux_tree/linuxrc"
+
+	if ! ( cd "$_porteux_tree" && find . | cpio -o -H newc | zstd -q -c >"$_porteux_repacked" ); then
+		nb_error "Could not repack the $PORTEUX_LABEL zstd initramfs."
+		rm -rf "$_porteux_tree"
+		return 1
+	fi
+
+	rm -rf "$_porteux_tree"
+	mv "$_porteux_repacked" "$_porteux_final"
+	rm -f /tmp/nb-initrd
+	ln -s "$_porteux_final" /tmp/nb-initrd
+	return 0
+}
+
+porteux_prepare_from_iso ()
+{
+	_porteux_iso_url="$1"
+	_porteux_work="/tmp/nb-porteux-work"
+	_porteux_iso="$_porteux_work/nb-porteux.iso"
+	_porteux_boot="$_porteux_work/boot"
+
+	if ! _porteux_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $PORTEUX_LABEL ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_porteux_work " /proc/mounts 2>/dev/null; then
+		umount "$_porteux_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_porteux_work"
+	mkdir -p "$_porteux_boot"
+	_porteux_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_porteux_work" 2>/tmp/nb-porteux-mount.log; then
+		_porteux_mounted=1
+		mkdir -p "$_porteux_boot"
+	fi
+
+	if ! wgetgauge "$_porteux_iso_url" "$_porteux_iso" "Downloading $PORTEUX_LABEL ISO"; then
+		nb_error "Could not download $PORTEUX_LABEL ISO from:\n\n$_porteux_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
+		rm -rf "$_porteux_work"
+		return 1
+	fi
+
+	if ! "$_porteux_7z" e -y -o"$_porteux_boot" "$_porteux_iso" "$PORTEUX_KERNEL_PATH" "$PORTEUX_INITRD_PATH" >/tmp/nb-porteux-7z.log 2>&1; then
+		nb_error "Could not extract $PORTEUX_LABEL boot files from the ISO.\nSee /tmp/nb-porteux-7z.log for details."
+		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
+		rm -rf "$_porteux_work"
+		return 1
+	fi
+	_porteux_kernel_file="${PORTEUX_KERNEL_PATH##*/}"
+	_porteux_initrd_file="${PORTEUX_INITRD_PATH##*/}"
+	if [ ! -s "$_porteux_boot/$_porteux_kernel_file" ] || [ ! -s "$_porteux_boot/$_porteux_initrd_file" ]; then
+		nb_error "The $PORTEUX_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
+		rm -rf "$_porteux_work"
+		return 1
+	fi
+
+	mv "$_porteux_boot/$_porteux_kernel_file" /tmp/nb-linux
+	mv "$_porteux_boot/$_porteux_initrd_file" /tmp/nb-initrd
+	rm -rf "$_porteux_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $PORTEUX_LABEL ISO into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! porteux_repack_initrd_with_iso "$_porteux_iso"; then
+		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
+		rm -rf "$_porteux_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-porteux-7z.log /tmp/nb-porteux-mount.log /tmp/nb-porteux-cpio.log
+	return 0
+}
+
+chimera_repack_initrd_with_iso ()
+{
+	_chimera_iso="$1"
+	_chimera_parent="${_chimera_iso%/*}"
+	_chimera_tree="$_chimera_parent/initrd-work"
+	_chimera_repacked="$_chimera_parent/nb-initrd.repacked"
+	_chimera_new="$_chimera_parent/nb-initrd.new"
+	_chimera_final="$_chimera_parent/nb-initrd"
+
+	if ! _chimera_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $CHIMERA_LABEL initramfs compression format."
+		return 1
+	fi
+	_chimera_format="${_chimera_main_info%% *}"
+	_chimera_main_offset="${_chimera_main_info#* }"
+
+	if [ "$_chimera_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$CHIMERA_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_chimera_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$CHIMERA_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_chimera_tree" "$_chimera_repacked" "$_chimera_new" "$_chimera_final"
+	mkdir -p "$_chimera_tree"
+	case "$_chimera_format" in
+		gzip)
+			if ! ( tail -c +"$(( _chimera_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_chimera_tree" && cpio -idmu ) ) 2>/tmp/nb-chimera-cpio.log; then
+				nb_error "Could not unpack the $CHIMERA_LABEL gzip initramfs."
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _chimera_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_chimera_tree" && cpio -idmu ) ) 2>/tmp/nb-chimera-cpio.log; then
+				nb_error "Could not unpack the $CHIMERA_LABEL zstd initramfs."
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _chimera_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_chimera_tree" && cpio -idmu ) ) 2>/tmp/nb-chimera-cpio.log; then
+				nb_error "Could not unpack the $CHIMERA_LABEL xz initramfs."
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _chimera_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_chimera_tree" && cpio -idmu ) ) 2>/tmp/nb-chimera-cpio.log; then
+				nb_error "Could not unpack the $CHIMERA_LABEL cpio initramfs."
+				return 1
+			fi
+			;;
+	esac
+	if [ ! -s "$_chimera_tree/usr/sbin/live-boot" ]; then
+		nb_error "Could not find the $CHIMERA_LABEL live-boot initramfs files."
+		rm -rf "$_chimera_tree"
+		return 1
+	fi
+	_chimera_helpers="$_chimera_tree/usr/lib/live/boot/9990-misc-helpers.sh"
+	if [ ! -s "$_chimera_helpers" ]; then
+		nb_error "Could not find the $CHIMERA_LABEL live media helper script."
+		rm -rf "$_chimera_tree"
+		return 1
+	fi
+	if ! awk '
+		$0 == "\t\t\t\t\tmount -t $fs_type \"${FROMISO}\" /run/live/fromiso" && !patched {
+			print "\t\t\t\t\tmodprobe -q -b loop 1>/dev/null"
+			print "\t\t\t\t\tudevadm settle"
+			print
+			patched=1
+			next
+		}
+		{ print }
+		END { if (!patched) exit 1 }
+	' "$_chimera_helpers" >"$_chimera_helpers.new"; then
+		nb_error "Could not patch the $CHIMERA_LABEL embedded ISO mount path."
+		rm -rf "$_chimera_tree"
+		return 1
+	fi
+	mv "$_chimera_helpers.new" "$_chimera_helpers"
+
+	mkdir -p "$_chimera_tree/.netbootcd"
+	if ! mv "$_chimera_iso" "$_chimera_tree/.netbootcd/chimera.iso"; then
+		nb_error "Could not embed the $CHIMERA_LABEL ISO into the initramfs."
+		rm -rf "$_chimera_tree"
+		return 1
+	fi
+
+	case "$_chimera_format" in
+		gzip)
+			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc | gzip -1 -c >"$_chimera_repacked" ); then
+				nb_error "Could not repack the $CHIMERA_LABEL gzip initramfs."
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc | zstd -q -c >"$_chimera_repacked" ); then
+				nb_error "Could not repack the $CHIMERA_LABEL zstd initramfs."
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_chimera_repacked" ); then
+				nb_error "Could not repack the $CHIMERA_LABEL xz initramfs."
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc >"$_chimera_repacked" ); then
+				nb_error "Could not repack the $CHIMERA_LABEL cpio initramfs."
+				return 1
+			fi
+			;;
+	esac
+
+	rm -rf "$_chimera_tree"
+	: >"$_chimera_new"
+	if [ "$_chimera_main_offset" -gt 0 ]; then
+		if ! head -c "$_chimera_main_offset" /tmp/nb-initrd >>"$_chimera_new"; then
+			nb_error "Could not preserve the $CHIMERA_LABEL early initramfs prefix."
+			return 1
+		fi
+	fi
+	if ! cat "$_chimera_repacked" >>"$_chimera_new"; then
+		nb_error "Could not write the repacked $CHIMERA_LABEL initramfs."
+		return 1
+	fi
+	mv "$_chimera_new" "$_chimera_final"
+	rm -f "$_chimera_repacked" /tmp/nb-initrd
+	ln -s "$_chimera_final" /tmp/nb-initrd
+	return 0
+}
+
+chimera_prepare_from_iso ()
+{
+	_chimera_iso_url="$1"
+	_chimera_work="/tmp/nb-chimera-work"
+	_chimera_iso="$_chimera_work/nb-chimera.iso"
+	_chimera_boot="$_chimera_work/boot"
+
+	if ! _chimera_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $CHIMERA_LABEL ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_chimera_work " /proc/mounts 2>/dev/null; then
+		umount "$_chimera_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_chimera_work"
+	mkdir -p "$_chimera_boot"
+	_chimera_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_chimera_work" 2>/tmp/nb-chimera-mount.log; then
+		_chimera_mounted=1
+		mkdir -p "$_chimera_boot"
+	fi
+
+	if ! wgetgauge "$_chimera_iso_url" "$_chimera_iso" "Downloading $CHIMERA_LABEL ISO"; then
+		nb_error "Could not download $CHIMERA_LABEL ISO from:\n\n$_chimera_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_chimera_mounted" ] && umount "$_chimera_work" 2>/dev/null || true
+		rm -rf "$_chimera_work"
+		return 1
+	fi
+
+	if ! "$_chimera_7z" e -y -o"$_chimera_boot" "$_chimera_iso" "$CHIMERA_KERNEL_PATH" "$CHIMERA_INITRD_PATH" >/tmp/nb-chimera-7z.log 2>&1; then
+		nb_error "Could not extract $CHIMERA_LABEL boot files from the ISO.\nSee /tmp/nb-chimera-7z.log for details."
+		[ -n "$_chimera_mounted" ] && umount "$_chimera_work" 2>/dev/null || true
+		rm -rf "$_chimera_work"
+		return 1
+	fi
+	_chimera_kernel_file="${CHIMERA_KERNEL_PATH##*/}"
+	_chimera_initrd_file="${CHIMERA_INITRD_PATH##*/}"
+	if [ ! -s "$_chimera_boot/$_chimera_kernel_file" ] || [ ! -s "$_chimera_boot/$_chimera_initrd_file" ]; then
+		nb_error "The $CHIMERA_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_chimera_mounted" ] && umount "$_chimera_work" 2>/dev/null || true
+		rm -rf "$_chimera_work"
+		return 1
+	fi
+
+	mv "$_chimera_boot/$_chimera_kernel_file" /tmp/nb-linux
+	mv "$_chimera_boot/$_chimera_initrd_file" /tmp/nb-initrd
+	rm -rf "$_chimera_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $CHIMERA_LABEL ISO into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! chimera_repack_initrd_with_iso "$_chimera_iso"; then
+		[ -n "$_chimera_mounted" ] && umount "$_chimera_work" 2>/dev/null || true
+		rm -rf "$_chimera_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-chimera-7z.log /tmp/nb-chimera-mount.log /tmp/nb-chimera-cpio.log
+	return 0
+}
+
+coyote_repack_initrd_with_iso ()
+{
+	_coyote_iso="$1"
+	_coyote_parent="${_coyote_iso%/*}"
+	_coyote_tree="$_coyote_parent/initrd-work"
+	_coyote_repacked="$_coyote_parent/nb-initrd.repacked"
+	_coyote_final="$_coyote_parent/nb-initrd"
+	_coyote_media_script="$_coyote_tree/init.d/03-find-installer.sh"
+
+	rm -rf "$_coyote_tree" "$_coyote_repacked" "$_coyote_final"
+	mkdir -p "$_coyote_tree"
+	if ! ( gzip -cd /tmp/nb-initrd | ( cd "$_coyote_tree" && cpio -idmu ) ) 2>/tmp/nb-coyote-cpio.log; then
+		nb_error "Could not unpack the $COYOTE_LABEL initramfs.\nSee /tmp/nb-coyote-cpio.log for details."
+		rm -rf "$_coyote_tree"
+		return 1
+	fi
+	if [ ! -s "$_coyote_media_script" ]; then
+		nb_error "Could not find the $COYOTE_LABEL installer media search script."
+		rm -rf "$_coyote_tree"
+		return 1
+	fi
+
+	mkdir -p "$_coyote_tree/netbootcd"
+	if ! mv "$_coyote_iso" "$_coyote_tree/netbootcd/coyote.iso"; then
+		nb_error "Could not embed the $COYOTE_LABEL ISO into the initramfs."
+		rm -rf "$_coyote_tree"
+		return 1
+	fi
+
+	if ! awk '
+		/^# Function to check CD-ROM devices for installer$/ && !added_function {
+			print "# Function to check the installer ISO embedded by NetbootCD-Neo"
+			print "check_netbootcd_media() {"
+			print "    [ -f /netbootcd/coyote.iso ] || return 1"
+			print ""
+			print "    log \"  Checking embedded installer ISO\""
+			print "    [ -b /dev/loop0 ] || mknod /dev/loop0 b 7 0 2>/dev/null || true"
+			print "    /bin/busybox losetup /dev/loop0 /netbootcd/coyote.iso 2>/dev/null || return 1"
+			print "    if ! mount -o ro /dev/loop0 \"$MEDIA_MNT\" 2>/dev/null; then"
+			print "        /bin/busybox losetup -d /dev/loop0 2>/dev/null || true"
+			print "        return 1"
+			print "    fi"
+			print ""
+			print "    if [ -f \"${MEDIA_MNT}/coyote.marker\" ]; then"
+			print "        marker=$(cat \"${MEDIA_MNT}/coyote.marker\" 2>/dev/null)"
+			print "        if [ \"$marker\" = \"COYOTE_INSTALLER\" ]; then"
+			print "            INSTALLER_MEDIA=/dev/loop0"
+			print "            INSTALLER_MEDIA_TYPE=embedded"
+			print "            log \"  Found embedded installer ISO\""
+			print "            return 0"
+			print "        fi"
+			print "    fi"
+			print "    umount \"$MEDIA_MNT\" 2>/dev/null"
+			print "    /bin/busybox losetup -d /dev/loop0 2>/dev/null || true"
+			print "    return 1"
+			print "}"
+			print ""
+			added_function=1
+		}
+		/^if ! check_cdrom_devices && ! check_disk_devices; then$/ {
+			print "if ! check_netbootcd_media && ! check_cdrom_devices && ! check_disk_devices; then"
+			changed_search=1
+			next
+		}
+		{ print }
+		END { if (!added_function || !changed_search) exit 1 }
+	' "$_coyote_media_script" >"$_coyote_media_script.new"; then
+		nb_error "Could not patch the $COYOTE_LABEL installer media search."
+		rm -rf "$_coyote_tree"
+		return 1
+	fi
+	mv "$_coyote_media_script.new" "$_coyote_media_script"
+	chmod 755 "$_coyote_media_script"
+
+	if ! ( cd "$_coyote_tree" && find . | cpio -o -H newc | gzip -1 -c >"$_coyote_repacked" ); then
+		nb_error "Could not repack the $COYOTE_LABEL gzip initramfs."
+		rm -rf "$_coyote_tree"
+		return 1
+	fi
+
+	rm -rf "$_coyote_tree"
+	mv "$_coyote_repacked" "$_coyote_final"
+	rm -f /tmp/nb-initrd
+	ln -s "$_coyote_final" /tmp/nb-initrd
+	return 0
+}
+
+coyote_prepare_from_iso ()
+{
+	_coyote_iso_url="$1"
+	_coyote_work="/tmp/nb-coyote-work"
+	_coyote_iso="$_coyote_work/nb-coyote.iso"
+	_coyote_boot="$_coyote_work/boot"
+
+	if ! _coyote_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $COYOTE_LABEL ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_coyote_work " /proc/mounts 2>/dev/null; then
+		umount "$_coyote_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_coyote_work"
+	mkdir -p "$_coyote_boot"
+	_coyote_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_coyote_work" 2>/tmp/nb-coyote-mount.log; then
+		_coyote_mounted=1
+		mkdir -p "$_coyote_boot"
+	fi
+
+	if ! wgetgauge "$_coyote_iso_url" "$_coyote_iso" "Downloading $COYOTE_LABEL ISO"; then
+		nb_error "Could not download $COYOTE_LABEL ISO from:\n\n$_coyote_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_coyote_mounted" ] && umount "$_coyote_work" 2>/dev/null || true
+		rm -rf "$_coyote_work"
+		return 1
+	fi
+
+	if ! "$_coyote_7z" e -y -o"$_coyote_boot" "$_coyote_iso" "$COYOTE_KERNEL_PATH" "$COYOTE_INITRD_PATH" >/tmp/nb-coyote-7z.log 2>&1; then
+		nb_error "Could not extract $COYOTE_LABEL boot files from the ISO.\nSee /tmp/nb-coyote-7z.log for details."
+		[ -n "$_coyote_mounted" ] && umount "$_coyote_work" 2>/dev/null || true
+		rm -rf "$_coyote_work"
+		return 1
+	fi
+	_coyote_kernel_file="${COYOTE_KERNEL_PATH##*/}"
+	_coyote_initrd_file="${COYOTE_INITRD_PATH##*/}"
+	if [ ! -s "$_coyote_boot/$_coyote_kernel_file" ] || [ ! -s "$_coyote_boot/$_coyote_initrd_file" ]; then
+		nb_error "The $COYOTE_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_coyote_mounted" ] && umount "$_coyote_work" 2>/dev/null || true
+		rm -rf "$_coyote_work"
+		return 1
+	fi
+
+	mv "$_coyote_boot/$_coyote_kernel_file" /tmp/nb-linux
+	mv "$_coyote_boot/$_coyote_initrd_file" /tmp/nb-initrd
+	rm -rf "$_coyote_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $COYOTE_LABEL ISO into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! coyote_repack_initrd_with_iso "$_coyote_iso"; then
+		[ -n "$_coyote_mounted" ] && umount "$_coyote_work" 2>/dev/null || true
+		rm -rf "$_coyote_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-coyote-7z.log /tmp/nb-coyote-mount.log /tmp/nb-coyote-cpio.log
 	return 0
 }
 
@@ -2219,6 +2821,7 @@ antix_mx_iso_file ()
 {
 	case "$1" in
 		antix-26-core) printf '%s\n' 'antix-linux/Final/antiX-26/antiX-26_x64-core.iso' ;;
+		avlinux-mxe-251) printf '%s\n' 'https://downloads.bandshed.net/AVL_MXe_25/AVL_MXe-25.1_x64.iso' ;;
 		mx-25.1-xfce) printf '%s\n' 'mx-linux/Final/Xfce/MX-25.1_Xfce_x64.iso' ;;
 		mx-25.1-xfce-ahs) printf '%s\n' 'mx-linux/Final/Xfce/MX-25.1_Xfce_ahs_x64.iso' ;;
 		*) return 1 ;;
@@ -2229,6 +2832,7 @@ antix_mx_iso_label ()
 {
 	case "$1" in
 		antix-26-core) printf '%s\n' 'antiX 26 Core' ;;
+		avlinux-mxe-251) printf '%s\n' 'AV Linux MXE 25.1' ;;
 		mx-25.1-xfce) printf '%s\n' 'MX Linux 25.1 Xfce' ;;
 		mx-25.1-xfce-ahs) printf '%s\n' 'MX Linux 25.1 Xfce AHS' ;;
 		*) return 1 ;;
@@ -2238,7 +2842,10 @@ antix_mx_iso_label ()
 antix_mx_iso_url ()
 {
 	_antix_mx_iso_file="$1"
-	printf 'http://downloads.sourceforge.net/project/%s\n' "$_antix_mx_iso_file"
+	case "$_antix_mx_iso_file" in
+		http://*|https://*) printf '%s\n' "$_antix_mx_iso_file" ;;
+		*) printf 'http://downloads.sourceforge.net/project/%s\n' "$_antix_mx_iso_file" ;;
+	esac
 }
 
 antix_mx_iso_setup ()
@@ -3601,10 +4208,16 @@ artix_initrd_format ()
 artix_cpio_blocks_offset ()
 {
 	_artix_initrd="$1"
+	_artix_cpio_offset="${2:-0}"
 	_artix_blocks_file="/tmp/nb-artix-cpio-blocks"
 
 	rm -f "$_artix_blocks_file"
-	if ! ( cpio -t <"$_artix_initrd" >/dev/null 2>"$_artix_blocks_file" ); then
+	if [ "$_artix_cpio_offset" -gt 0 ]; then
+		if ! ( tail -c +"$(( _artix_cpio_offset + 1 ))" "$_artix_initrd" | cpio -t >/dev/null 2>"$_artix_blocks_file" ); then
+			rm -f "$_artix_blocks_file"
+			return 1
+		fi
+	elif ! ( cpio -t <"$_artix_initrd" >/dev/null 2>"$_artix_blocks_file" ); then
 		rm -f "$_artix_blocks_file"
 		return 1
 	fi
@@ -3613,7 +4226,7 @@ artix_cpio_blocks_offset ()
 	case "$_artix_blocks" in
 		''|*[!0-9]*) return 1 ;;
 	esac
-	printf '%s\n' "$(( _artix_blocks * 512 ))"
+	printf '%s\n' "$(( _artix_cpio_offset + _artix_blocks * 512 ))"
 }
 
 artix_find_main_initrd ()
@@ -3628,26 +4241,39 @@ artix_find_main_initrd ()
 		return 0
 	fi
 
-	if ! _artix_scan=$(artix_cpio_blocks_offset "$_artix_initrd"); then
-		printf '%s %s\n' cpio 0
-		return 0
-	fi
 	_artix_size=$(artix_file_size "$_artix_initrd")
-	_artix_limit=$(( _artix_scan + 1048576 ))
-	[ "$_artix_limit" -gt "$_artix_size" ] && _artix_limit="$_artix_size"
+	_artix_cpio_offset=0
 
-	while [ "$_artix_scan" -lt "$_artix_limit" ]; do
-		_artix_byte=$(dd if="$_artix_initrd" bs=1 skip="$_artix_scan" count=1 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
-		[ -z "$_artix_byte" ] && break
-		if [ "$_artix_byte" = "00" ]; then
-			_artix_scan=$(( _artix_scan + 1 ))
-			continue
-		fi
-		if _artix_tail_format=$(artix_initrd_format_at "$_artix_initrd" "$_artix_scan"); then
-			printf '%s %s\n' "$_artix_tail_format" "$_artix_scan"
+	while :; do
+		if ! _artix_scan=$(artix_cpio_blocks_offset "$_artix_initrd" "$_artix_cpio_offset"); then
+			printf '%s %s\n' cpio 0
 			return 0
 		fi
-		break
+		_artix_limit=$(( _artix_scan + 1048576 ))
+		[ "$_artix_limit" -gt "$_artix_size" ] && _artix_limit="$_artix_size"
+
+		while [ "$_artix_scan" -lt "$_artix_limit" ]; do
+			_artix_byte=$(dd if="$_artix_initrd" bs=1 skip="$_artix_scan" count=1 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
+			[ -z "$_artix_byte" ] && break
+			if [ "$_artix_byte" = "00" ]; then
+				_artix_scan=$(( _artix_scan + 1 ))
+				continue
+			fi
+			if _artix_tail_format=$(artix_initrd_format_at "$_artix_initrd" "$_artix_scan"); then
+				if [ "$_artix_tail_format" = "cpio" ]; then
+					_artix_cpio_offset="$_artix_scan"
+					break
+				fi
+				printf '%s %s\n' "$_artix_tail_format" "$_artix_scan"
+				return 0
+			fi
+			printf '%s %s\n' cpio 0
+			return 0
+		done
+
+		if [ "$_artix_cpio_offset" != "$_artix_scan" ]; then
+			break
+		fi
 	done
 
 	printf '%s %s\n' cpio 0
@@ -4130,6 +4756,18 @@ PIKA_ISO_URL=
 PIKA_LABEL=
 PIKA_ISO_FILE=
 PIKA_ISO_VOLUME=
+PORTEUX_ISO_URL=
+PORTEUX_LABEL=
+PORTEUX_KERNEL_PATH=
+PORTEUX_INITRD_PATH=
+CHIMERA_ISO_URL=
+CHIMERA_LABEL=
+CHIMERA_KERNEL_PATH=
+CHIMERA_INITRD_PATH=
+COYOTE_ISO_URL=
+COYOTE_LABEL=
+COYOTE_KERNEL_PATH=
+COYOTE_INITRD_PATH=
 PUPPY_ISO_URL=
 PUPPY_LABEL=
 PUPPY_KERNEL_PATH=
@@ -4242,7 +4880,7 @@ if [ $DISTRO = "ubuntu" ];then
 fi
 if [ $DISTRO = "ubuntuflavor" ];then
 	UBUNTU_LIVE_CUSTOM=
-	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 24 78 18 \
+	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 24 78 19 \
 	kubuntu-26.04 "Kubuntu 26.04 LTS" \
 	xubuntu-26.04 "Xubuntu 26.04 LTS" \
 	lubuntu-26.04 "Lubuntu 26.04 LTS" \
@@ -4254,6 +4892,7 @@ if [ $DISTRO = "ubuntuflavor" ];then
 		mate-24.04 "Ubuntu MATE 24.04.4 LTS" \
 		bodhi-7.0 "Bodhi Linux 7.0.0" \
 		funos-24.04 "FunOS 24.04.4 LTS Calamares" \
+		kde-neon-user "KDE neon User Edition" \
 		linuxlite-7.8 "Linux Lite 7.8" \
 		rhino-2025.4 "Rhino Linux 2025.4" \
 	trisquel-mini-12 "Trisquel Mini 12.0" \
@@ -4294,6 +4933,13 @@ if [ $DISTRO = "ubuntuflavor" ];then
 			"FunOS 24.04.4 LTS Calamares" \
 			"http://downloads.sourceforge.net/project/funos/noble/final/24.04.4/funos-24.04.4-stable.20260407-calamares.iso" \
 			"username=funos hostname=funos" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "kde-neon-user" ]; then
+		ubuntu_casper_iso_setup \
+			"KDE neon User Edition" \
+			"https://files.kde.org/neon/images/user/current/neon-user-current.iso" \
+			"username=neon hostname=neon" || return
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
 	elif [ "$VERSION" = "linuxlite-7.8" ]; then
@@ -4400,6 +5046,9 @@ if [ $DISTRO = "debianlive" ];then
 	butterbian-xfce "Butterbian Xfce 0.2.1" \
 	butterknife "Butterknife 0.1.11" \
 	bunsenlabs-carbon "BunsenLabs Carbon 1" \
+	crowz-openbox "CROWZ 5.0.1 Openbox" \
+	crowz-fluxbox "CROWZ 5.0.1 Fluxbox" \
+	crowz-jwm "CROWZ 5.0.1 JWM" \
 	emmabuntus-de6-core "Emmabuntus DE6 Core" \
 	locos-24 "Loc-OS 24" \
 	mauna-christian "Mauna Linux 25.2 Christian Edition" \
@@ -4425,6 +5074,7 @@ fi
 if [ $DISTRO = "antixmx" ];then
 	dialog --backtitle "$TITLE" --menu "Choose an antiX/MX live installer to boot:" 18 75 8 \
 	antix-26-core "antiX 26 Core" \
+	avlinux-mxe-251 "AV Linux MXE 25.1" \
 	mx-25.1-xfce "MX Linux 25.1 Xfce" \
 	mx-25.1-xfce-ahs "MX Linux 25.1 Xfce AHS" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
@@ -4433,7 +5083,10 @@ if [ $DISTRO = "antixmx" ];then
 fi
 
 if [ "$DISTRO" = "communitylive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 22 78 12 \
+	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 14 \
+	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
+	chimera-base "Chimera Linux Base 2025-12-20" \
+	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
 	easyos-excalibur "EasyOS Excalibur 7.3.3" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
@@ -4441,6 +5094,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
 	pikaos-niri "PikaOS 4.0 Niri" \
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
+	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	solus-xfce "Solus Xfce 2026-04-18" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
@@ -4824,6 +5478,21 @@ elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
 elif [ -n "${PIKA_ISO_URL:-}" ]; then
 	if ! pika_prepare_from_iso "$PIKA_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-pika.iso
+		return 1
+	fi
+elif [ -n "${PORTEUX_ISO_URL:-}" ]; then
+	if ! porteux_prepare_from_iso "$PORTEUX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-porteux.iso
+		return 1
+	fi
+elif [ -n "${CHIMERA_ISO_URL:-}" ]; then
+	if ! chimera_prepare_from_iso "$CHIMERA_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-chimera.iso
+		return 1
+	fi
+elif [ -n "${COYOTE_ISO_URL:-}" ]; then
+	if ! coyote_prepare_from_iso "$COYOTE_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-coyote.iso
 		return 1
 	fi
 elif [ -n "${PUPPY_ISO_URL:-}" ]; then
