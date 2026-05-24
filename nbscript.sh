@@ -160,6 +160,34 @@ coyote_iso_setup ()
 	echo -n "console=tty0 quiet installer " >>/tmp/nb-options
 }
 
+nutyx_iso_setup ()
+{
+	NUTYX_LABEL="$1"
+	NUTYX_ISO_URL="$2"
+	NUTYX_KERNEL_PATH="$3"
+	NUTYX_INITRD_PATH="$4"
+	NUTYX_ROOTFS_PATH="$5"
+	echo -n "ro quiet rootdelay=5 live " >>/tmp/nb-options
+}
+
+salix_iso_setup ()
+{
+	SALIX_LABEL="$1"
+	SALIX_ISO_URL="$2"
+	SALIX_KERNEL_PATH="$3"
+	SALIX_INITRD_PATH="$4"
+	echo -n "$5 " >>/tmp/nb-options
+}
+
+venom_iso_setup ()
+{
+	VENOM_LABEL="$1"
+	VENOM_ISO_URL="$2"
+	VENOM_KERNEL_PATH="$3"
+	VENOM_INITRD_PATH="$4"
+	echo -n "ro quiet wait=15 " >>/tmp/nb-options
+}
+
 community_live_iso_setup ()
 {
 	_community_live_tag="$1"
@@ -238,6 +266,35 @@ community_live_iso_setup ()
 				"1.img" \
 				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
 				"easyos/" || return
+			;;
+		libreelec-generic)
+			libreelec_img_setup \
+				"LibreELEC Generic x86_64 12.2.1" \
+				"https://releases.libreelec.tv/LibreELEC-Generic.x86_64-12.2.1.img.gz" \
+				"https://raw.githubusercontent.com/LibreELEC/LibreELEC.tv/12.2.1/packages/sysutils/busybox/scripts/init" || return
+			;;
+		nutyx-xfce-260403)
+			nutyx_iso_setup \
+				"NuTyX 26.04.3 Xfce" \
+				"http://downloads.sourceforge.net/project/nutyx/ISOs/NuTyX_x86_64-26.04.3-XFCE4.iso" \
+				"boot/kernel-618" \
+				"boot/initrd-618" \
+				"boot/NuTyX.squashfs" || return
+			;;
+		salixlive-xfce-150)
+			salix_iso_setup \
+				"SalixLive64 Xfce 15.0" \
+				"http://phoenixnap.dl.sourceforge.net/project/salix/15.0/salixlive64-xfce-15.0.iso" \
+				"boot/vmlinuz" \
+				"boot/initrd.gz" \
+				"max_loop=255 vga=791 locale=en_US.utf8 keymap=us useswap=no copy2ram=no tz=Etc/GMT hwc=localtime runlevel=4" || return
+			;;
+		venom-base-sysv-20260320)
+			venom_iso_setup \
+				"Venom Linux Base SysV 2026-03-20" \
+				"http://master.dl.sourceforge.net/project/venomlinux/ISO/venomlinux-base-sysv-x86_64-20260320.iso?viasf=1" \
+				"boot/vmlinuz" \
+				"boot/initrd" || return
 			;;
 		porteux-lxde)
 			porteux_iso_setup \
@@ -360,6 +417,16 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_BOOT_URL="http://downloads.sourceforge.net/project/emmabuntus/Emmabuntus_DE6/Images/1.01/emmabuntus-de6-core-amd64-13.4-1.01.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=emmabuntus"
 			;;
+		enux-533)
+			DEBIAN_LIVE_LABEL="ENux 5.3.3 Xfce"
+			DEBIAN_LIVE_ISO_URL="http://master.dl.sourceforge.net/project/enux/ENux-5.3.3/ENux-5.3.3.iso?viasf=1"
+			DEBIAN_LIVE_OPTIONS="quiet nosplash"
+			;;
+		exegnu-daedalus)
+			DEBIAN_LIVE_LABEL="Exe GNU/Linux Daedalus Trinity"
+			DEBIAN_LIVE_ISO_URL="http://master.dl.sourceforge.net/project/exegnulinux/iso/daedalus/exegnu64_daedalus-20250511.iso?viasf=1"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=exegnu nocomponents=xinit locales=en_US.UTF-8"
+			;;
 		locos-24)
 			DEBIAN_LIVE_LABEL="Loc-OS 24"
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/loc-os/Loc-OS%2024/Loc-OS-24-current_amd64.iso"
@@ -456,6 +523,9 @@ debian_live_iso_setup ()
 			if [ "$EFIMODE" = 1 ]; then
 				DEBIAN_LIVE_OPTIONS="$DEBIAN_LIVE_OPTIONS modprobe.blacklist=video module_blacklist=video"
 			fi
+			;;
+		enux-*|exegnu-*)
+			DEBIAN_LIVE_MODE=embed
 			;;
 		refracta-*)
 			DEBIAN_LIVE_MODE=embed
@@ -1658,6 +1728,387 @@ coyote_prepare_from_iso ()
 	return 0
 }
 
+nutyx_repack_initrd_with_rootfs ()
+{
+	_nutyx_rootfs="$1"
+	_nutyx_work="/tmp/nb-nutyx-initrd-work"
+	_nutyx_repacked="/tmp/nb-initrd.nutyx"
+
+	if ! command -v zstd >/dev/null 2>&1; then
+		nb_error "zstd is required to prepare the $NUTYX_LABEL initramfs. Rebuild NetbootCD-Neo with zstd included."
+		return 1
+	fi
+
+	rm -rf "$_nutyx_work" "$_nutyx_repacked"
+	mkdir -p "$_nutyx_work"
+	if ! ( zstd -dc /tmp/nb-initrd | ( cd "$_nutyx_work" && cpio -idmu ) ) 2>/tmp/nb-nutyx-cpio.log; then
+		nb_error "Could not unpack the $NUTYX_LABEL zstd initramfs.\nSee /tmp/nb-nutyx-cpio.log for details."
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+	if [ ! -s "$_nutyx_work/init" ]; then
+		nb_error "Could not find the $NUTYX_LABEL initramfs media search logic."
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+
+	mkdir -p "$_nutyx_work/media/cdrom/boot"
+	if ! mv "$_nutyx_rootfs" "$_nutyx_work/media/cdrom/boot/NuTyX.squashfs"; then
+		nb_error "Could not embed the $NUTYX_LABEL live filesystem."
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+
+	if ! awk '
+		/^find_media\(\) \{$/ {
+			print
+			print "\tif [ -s /media/cdrom/boot/NuTyX.squashfs ]; then"
+			print "\t\tprintf \"Using embedded NetbootCD-Neo NuTyX media\\n\""
+			print "\t\treturn"
+			print "\tfi"
+			inserted=1
+			next
+		}
+		{ print }
+		END { if (!inserted) exit 1 }
+	' "$_nutyx_work/init" >"$_nutyx_work/init.new"; then
+		nb_error "Could not patch the $NUTYX_LABEL media search."
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+	mv "$_nutyx_work/init.new" "$_nutyx_work/init"
+	chmod 755 "$_nutyx_work/init"
+
+	if ! ( cd "$_nutyx_work" && find . | cpio -o -H newc | zstd -q -1 -c >"$_nutyx_repacked" ); then
+		nb_error "Could not repack the $NUTYX_LABEL zstd initramfs."
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+
+	rm -rf "$_nutyx_work"
+	mv "$_nutyx_repacked" /tmp/nb-initrd
+	return 0
+}
+
+nutyx_prepare_from_iso ()
+{
+	_nutyx_iso_url="$1"
+	_nutyx_work="/tmp/nb-nutyx-work"
+	_nutyx_iso="$_nutyx_work/nb-nutyx.iso"
+	_nutyx_extract="$_nutyx_work/extract"
+
+	if ! _nutyx_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $NUTYX_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_nutyx_work " /proc/mounts 2>/dev/null; then
+		umount "$_nutyx_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_nutyx_work" /tmp/nb-nutyx-initrd-work /tmp/nb-initrd.nutyx
+	mkdir -p "$_nutyx_extract"
+	_nutyx_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_nutyx_work" 2>/tmp/nb-nutyx-mount.log; then
+		_nutyx_mounted=1
+		mkdir -p "$_nutyx_extract"
+	fi
+
+	if ! wgetgauge "$_nutyx_iso_url" "$_nutyx_iso" "Downloading $NUTYX_LABEL ISO"; then
+		nb_error "Could not download $NUTYX_LABEL ISO from:\n\n$_nutyx_iso_url\n\nThis entry needs enough RAM to hold and prepare the installable live system."
+		[ -n "$_nutyx_mounted" ] && umount "$_nutyx_work" 2>/dev/null || true
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+
+	if ! "$_nutyx_7z" e -y -o"$_nutyx_extract" "$_nutyx_iso" "$NUTYX_KERNEL_PATH" "$NUTYX_INITRD_PATH" "$NUTYX_ROOTFS_PATH" >/tmp/nb-nutyx-7z.log 2>&1; then
+		nb_error "Could not extract $NUTYX_LABEL live files from the ISO.\nSee /tmp/nb-nutyx-7z.log for details."
+		[ -n "$_nutyx_mounted" ] && umount "$_nutyx_work" 2>/dev/null || true
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+	_nutyx_kernel_file="${NUTYX_KERNEL_PATH##*/}"
+	_nutyx_initrd_file="${NUTYX_INITRD_PATH##*/}"
+	_nutyx_rootfs_file="${NUTYX_ROOTFS_PATH##*/}"
+	if [ ! -s "$_nutyx_extract/$_nutyx_kernel_file" ] || [ ! -s "$_nutyx_extract/$_nutyx_initrd_file" ] || [ ! -s "$_nutyx_extract/$_nutyx_rootfs_file" ]; then
+		nb_error "The $NUTYX_LABEL ISO did not contain its expected live files."
+		[ -n "$_nutyx_mounted" ] && umount "$_nutyx_work" 2>/dev/null || true
+		rm -rf "$_nutyx_work"
+		return 1
+	fi
+
+	mv "$_nutyx_extract/$_nutyx_kernel_file" /tmp/nb-linux
+	mv "$_nutyx_extract/$_nutyx_initrd_file" /tmp/nb-initrd
+	rm -f "$_nutyx_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $NUTYX_LABEL live filesystem into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! nutyx_repack_initrd_with_rootfs "$_nutyx_extract/$_nutyx_rootfs_file"; then
+		[ -n "$_nutyx_mounted" ] && umount "$_nutyx_work" 2>/dev/null || true
+		rm -rf "$_nutyx_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-nutyx-7z.log /tmp/nb-nutyx-mount.log /tmp/nb-nutyx-cpio.log
+	[ -n "$_nutyx_mounted" ] && umount "$_nutyx_work" 2>/dev/null || true
+	rm -rf "$_nutyx_work"
+	return 0
+}
+
+salix_repack_initrd_with_iso ()
+{
+	_salix_iso="$1"
+	_salix_work="/tmp/nb-salix-initrd-work"
+	_salix_repacked="/tmp/nb-initrd.salix"
+
+	rm -rf "$_salix_work" "$_salix_repacked"
+	mkdir -p "$_salix_work"
+	if ! ( gzip -cd /tmp/nb-initrd | ( cd "$_salix_work" && cpio -idmu ) ) 2>/tmp/nb-salix-cpio.log; then
+		nb_error "Could not unpack the $SALIX_LABEL gzip initramfs.\nSee /tmp/nb-salix-cpio.log for details."
+		rm -rf "$_salix_work"
+		return 1
+	fi
+	if [ ! -s "$_salix_work/init" ]; then
+		nb_error "Could not find the $SALIX_LABEL initramfs media search logic."
+		rm -rf "$_salix_work"
+		return 1
+	fi
+
+	if ! mv "$_salix_iso" "$_salix_work/netbootcd-salix.iso"; then
+		nb_error "Could not embed the $SALIX_LABEL ISO into the initramfs."
+		rm -rf "$_salix_work"
+		return 1
+	fi
+	if ! awk '
+		{ print }
+		$0 == "mdev -s" {
+			print ""
+			print "# Attach the NetbootCD-Neo ISO before Salix searches for LIVE media."
+			print "if [ -f /netbootcd-salix.iso ]; then"
+			print "\tfor NETBOOTCD_LOOP_NUMBER in 0 1 2 3 4 5 6 7; do"
+			print "\t\tNETBOOTCD_LOOP_DEVICE=\"/dev/loop$NETBOOTCD_LOOP_NUMBER\""
+			print "\t\t[ -b \"$NETBOOTCD_LOOP_DEVICE\" ] || mknod \"$NETBOOTCD_LOOP_DEVICE\" b 7 \"$NETBOOTCD_LOOP_NUMBER\" 2>/dev/null"
+			print "\t\tif losetup \"$NETBOOTCD_LOOP_DEVICE\" /netbootcd-salix.iso 2>/dev/null; then"
+			print "\t\t\techo \"NetbootCD-Neo: attached embedded SalixLive ISO to $NETBOOTCD_LOOP_DEVICE\""
+			print "\t\t\tbreak"
+			print "\t\tfi"
+			print "\tdone"
+			print "fi"
+			inserted=1
+		}
+		END { if (!inserted) exit 1 }
+	' "$_salix_work/init" >"$_salix_work/init.new"; then
+		nb_error "Could not patch the $SALIX_LABEL media search."
+		rm -rf "$_salix_work"
+		return 1
+	fi
+	mv "$_salix_work/init.new" "$_salix_work/init"
+	chmod 755 "$_salix_work/init"
+
+	if ! ( cd "$_salix_work" && find . | cpio -o -H newc | gzip -1 -c >"$_salix_repacked" ); then
+		nb_error "Could not repack the $SALIX_LABEL gzip initramfs."
+		rm -rf "$_salix_work"
+		return 1
+	fi
+
+	rm -rf "$_salix_work"
+	mv "$_salix_repacked" /tmp/nb-initrd
+	return 0
+}
+
+salix_prepare_from_iso ()
+{
+	_salix_iso_url="$1"
+	_salix_work="/tmp/nb-salix-work"
+	_salix_iso="$_salix_work/nb-salix.iso"
+	_salix_extract="$_salix_work/extract"
+
+	if ! _salix_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $SALIX_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_salix_work " /proc/mounts 2>/dev/null; then
+		umount "$_salix_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_salix_work" /tmp/nb-salix-initrd-work /tmp/nb-initrd.salix
+	mkdir -p "$_salix_extract"
+	_salix_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_salix_work" 2>/tmp/nb-salix-mount.log; then
+		_salix_mounted=1
+		mkdir -p "$_salix_extract"
+	fi
+
+	if ! wgetgauge "$_salix_iso_url" "$_salix_iso" "Downloading $SALIX_LABEL ISO"; then
+		nb_error "Could not download $SALIX_LABEL ISO from:\n\n$_salix_iso_url\n\nThis entry needs enough RAM to hold and prepare the installable live system."
+		[ -n "$_salix_mounted" ] && umount "$_salix_work" 2>/dev/null || true
+		rm -rf "$_salix_work"
+		return 1
+	fi
+
+	if ! "$_salix_7z" e -y -o"$_salix_extract" "$_salix_iso" "$SALIX_KERNEL_PATH" "$SALIX_INITRD_PATH" >/tmp/nb-salix-7z.log 2>&1; then
+		nb_error "Could not extract $SALIX_LABEL boot files from the ISO.\nSee /tmp/nb-salix-7z.log for details."
+		[ -n "$_salix_mounted" ] && umount "$_salix_work" 2>/dev/null || true
+		rm -rf "$_salix_work"
+		return 1
+	fi
+	_salix_kernel_file="${SALIX_KERNEL_PATH##*/}"
+	_salix_initrd_file="${SALIX_INITRD_PATH##*/}"
+	if [ ! -s "$_salix_extract/$_salix_kernel_file" ] || [ ! -s "$_salix_extract/$_salix_initrd_file" ]; then
+		nb_error "The $SALIX_LABEL ISO did not contain its expected boot files."
+		[ -n "$_salix_mounted" ] && umount "$_salix_work" 2>/dev/null || true
+		rm -rf "$_salix_work"
+		return 1
+	fi
+
+	mv "$_salix_extract/$_salix_kernel_file" /tmp/nb-linux
+	mv "$_salix_extract/$_salix_initrd_file" /tmp/nb-initrd
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $SALIX_LABEL ISO into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! salix_repack_initrd_with_iso "$_salix_iso"; then
+		[ -n "$_salix_mounted" ] && umount "$_salix_work" 2>/dev/null || true
+		rm -rf "$_salix_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-salix-7z.log /tmp/nb-salix-mount.log /tmp/nb-salix-cpio.log
+	[ -n "$_salix_mounted" ] && umount "$_salix_work" 2>/dev/null || true
+	rm -rf "$_salix_work"
+	return 0
+}
+
+venom_repack_initrd_with_iso ()
+{
+	_venom_iso="$1"
+	_venom_work="/tmp/nb-venom-initrd-work"
+	_venom_repacked="/tmp/nb-initrd.venom"
+	_venom_liveiso="$_venom_work/hook/liveiso"
+
+	rm -rf "$_venom_work" "$_venom_repacked"
+	mkdir -p "$_venom_work"
+	if ! ( gzip -cd /tmp/nb-initrd | ( cd "$_venom_work" && cpio -idmu ) ) 2>/tmp/nb-venom-cpio.log; then
+		nb_error "Could not unpack the $VENOM_LABEL gzip initramfs.\nSee /tmp/nb-venom-cpio.log for details."
+		rm -rf "$_venom_work"
+		return 1
+	fi
+	if [ ! -s "$_venom_liveiso" ]; then
+		nb_error "Could not find the $VENOM_LABEL live media hook."
+		rm -rf "$_venom_work"
+		return 1
+	fi
+
+	mkdir -p "$_venom_work/.netbootcd"
+	if ! mv "$_venom_iso" "$_venom_work/.netbootcd/venom.iso"; then
+		nb_error "Could not embed the $VENOM_LABEL ISO into the initramfs."
+		rm -rf "$_venom_work"
+		return 1
+	fi
+	if ! awk '
+		$0 == "\tMEDIA=/dev/disk/by-label/LIVEISO" && !media {
+			print "\tif [ -f /.netbootcd/venom.iso ]; then"
+			print "\t\tMEDIA=/.netbootcd/venom.iso"
+			print "\t\tMEDIA_MOUNT_OPTS=\"-o loop,ro\""
+			print "\telse"
+			print "\t\tMEDIA=/dev/disk/by-label/LIVEISO"
+			print "\t\tMEDIA_MOUNT_OPTS=\"-o ro\""
+			print "\tfi"
+			media=1
+			next
+		}
+		$0 == "\tmount -o ro $MEDIA $MEDIUM || problem" && !mount_media {
+			print "\tmount $MEDIA_MOUNT_OPTS $MEDIA $MEDIUM || problem"
+			mount_media=1
+			next
+		}
+		{ print }
+		END { if (!media || !mount_media) exit 1 }
+	' "$_venom_liveiso" >"$_venom_liveiso.new"; then
+		nb_error "Could not patch the $VENOM_LABEL live media hook."
+		rm -rf "$_venom_work"
+		return 1
+	fi
+	mv "$_venom_liveiso.new" "$_venom_liveiso"
+	chmod 755 "$_venom_liveiso"
+
+	if ! ( cd "$_venom_work" && find . | cpio -o -H newc | gzip -1 -c >"$_venom_repacked" ); then
+		nb_error "Could not repack the $VENOM_LABEL gzip initramfs."
+		rm -rf "$_venom_work"
+		return 1
+	fi
+
+	rm -rf "$_venom_work"
+	mv "$_venom_repacked" /tmp/nb-initrd
+	return 0
+}
+
+venom_prepare_from_iso ()
+{
+	_venom_iso_url="$1"
+	_venom_work="/tmp/nb-venom-work"
+	_venom_iso="$_venom_work/nb-venom.iso"
+	_venom_extract="$_venom_work/extract"
+
+	if ! _venom_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $VENOM_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_venom_work " /proc/mounts 2>/dev/null; then
+		umount "$_venom_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_venom_work" /tmp/nb-venom-initrd-work /tmp/nb-initrd.venom
+	mkdir -p "$_venom_extract"
+	_venom_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_venom_work" 2>/tmp/nb-venom-mount.log; then
+		_venom_mounted=1
+		mkdir -p "$_venom_extract"
+	fi
+
+	if ! wgetgauge "$_venom_iso_url" "$_venom_iso" "Downloading $VENOM_LABEL ISO"; then
+		nb_error "Could not download $VENOM_LABEL ISO from:\n\n$_venom_iso_url\n\nThis entry needs enough RAM to hold and prepare the installable live system."
+		[ -n "$_venom_mounted" ] && umount "$_venom_work" 2>/dev/null || true
+		rm -rf "$_venom_work"
+		return 1
+	fi
+
+	if ! "$_venom_7z" e -y -o"$_venom_extract" "$_venom_iso" "$VENOM_KERNEL_PATH" "$VENOM_INITRD_PATH" >/tmp/nb-venom-7z.log 2>&1; then
+		nb_error "Could not extract $VENOM_LABEL boot files from the ISO.\nSee /tmp/nb-venom-7z.log for details."
+		[ -n "$_venom_mounted" ] && umount "$_venom_work" 2>/dev/null || true
+		rm -rf "$_venom_work"
+		return 1
+	fi
+	_venom_kernel_file="${VENOM_KERNEL_PATH##*/}"
+	_venom_initrd_file="${VENOM_INITRD_PATH##*/}"
+	if [ ! -s "$_venom_extract/$_venom_kernel_file" ] || [ ! -s "$_venom_extract/$_venom_initrd_file" ]; then
+		nb_error "The $VENOM_LABEL ISO did not contain its expected boot files."
+		[ -n "$_venom_mounted" ] && umount "$_venom_work" 2>/dev/null || true
+		rm -rf "$_venom_work"
+		return 1
+	fi
+
+	mv "$_venom_extract/$_venom_kernel_file" /tmp/nb-linux
+	mv "$_venom_extract/$_venom_initrd_file" /tmp/nb-initrd
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $VENOM_LABEL ISO into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! venom_repack_initrd_with_iso "$_venom_iso"; then
+		[ -n "$_venom_mounted" ] && umount "$_venom_work" 2>/dev/null || true
+		rm -rf "$_venom_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-venom-7z.log /tmp/nb-venom-mount.log /tmp/nb-venom-cpio.log
+	[ -n "$_venom_mounted" ] && umount "$_venom_work" 2>/dev/null || true
+	rm -rf "$_venom_work"
+	return 0
+}
+
 archiso_live_iso_setup ()
 {
 	ARCHISO_LABEL="$1"
@@ -2707,6 +3158,137 @@ easyos_prepare_from_img ()
 	rm -f "$_easyos_img" /tmp/nb-easyos-7z.log /tmp/nb-easyos-mount.log
 	[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
 	rm -rf "$_easyos_work"
+	return 0
+}
+
+libreelec_img_setup ()
+{
+	LIBREELEC_LABEL="$1"
+	LIBREELEC_IMG_URL="$2"
+	LIBREELEC_INIT_URL="$3"
+	echo -n "boot=NETBOOTCD BOOT_IMAGE=KERNEL SYSTEM_IMAGE=SYSTEM installer nofsck quiet systemd.debug_shell vga=current " >>/tmp/nb-options
+}
+
+libreelec_prepare_from_img ()
+{
+	_libreelec_img_url="$1"
+	_libreelec_work="/tmp/nb-libreelec-work"
+	_libreelec_img_gz="$_libreelec_work/nb-libreelec.img.gz"
+	_libreelec_fat="$_libreelec_work/system.fat"
+	_libreelec_overlay="$_libreelec_work/initrd-overlay"
+	_libreelec_flash="$_libreelec_overlay/.netbootcd/flash"
+
+	if ! _libreelec_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $LIBREELEC_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+	if ! command -v zstd >/dev/null 2>&1; then
+		nb_error "zstd is required to prepare the $LIBREELEC_LABEL ramdisk. Rebuild NetbootCD-Neo with zstd included."
+		return 1
+	fi
+
+	if grep -q " $_libreelec_work " /proc/mounts 2>/dev/null; then
+		umount "$_libreelec_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_libreelec_work"
+	mkdir -p "$_libreelec_flash"
+	_libreelec_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_libreelec_work" 2>/tmp/nb-libreelec-mount.log; then
+		_libreelec_mounted=1
+		mkdir -p "$_libreelec_flash"
+	fi
+
+	if ! wgetgauge "$_libreelec_img_url" "$_libreelec_img_gz" "Downloading $LIBREELEC_LABEL installer image"; then
+		nb_error "Could not download $LIBREELEC_LABEL image from:\n\n$_libreelec_img_url\n\nThis entry needs enough RAM to unpack and embed the installer files."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		return 1
+	fi
+
+	# The 12.2.1 Generic image places its 1 GiB FAT installer partition at 4 MiB.
+	# Pipe reads can be short, so use full blocks where BusyBox provides them.
+	if dd if=/dev/zero of=/dev/null bs=1 count=0 iflag=fullblock 2>/dev/null; then
+		gzip -cd "$_libreelec_img_gz" 2>/tmp/nb-libreelec-gzip.log |
+			dd iflag=fullblock bs=1048576 skip=4 count=1024 of="$_libreelec_fat" 2>/tmp/nb-libreelec-dd.log || true
+	else
+		gzip -cd "$_libreelec_img_gz" 2>/tmp/nb-libreelec-gzip.log |
+			dd bs=4096 skip=1024 count=262144 of="$_libreelec_fat" 2>/tmp/nb-libreelec-dd.log || true
+	fi
+	if [ "$(wc -c <"$_libreelec_fat" 2>/dev/null || echo 0)" -ne 1073741824 ]; then
+		nb_error "Could not unpack the $LIBREELEC_LABEL installer partition.\nSee /tmp/nb-libreelec-dd.log for details."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		return 1
+	fi
+	rm -f "$_libreelec_img_gz"
+
+	if ! "$_libreelec_7z" x -y -o"$_libreelec_flash" "$_libreelec_fat" >/tmp/nb-libreelec-7z.log 2>&1; then
+		nb_error "Could not find $LIBREELEC_LABEL installer files in its system partition.\nSee /tmp/nb-libreelec-7z.log for details."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		return 1
+	fi
+	rm -f "$_libreelec_fat"
+	if [ ! -s "$_libreelec_flash/KERNEL" ] || [ ! -s "$_libreelec_flash/SYSTEM" ]; then
+		nb_error "The $LIBREELEC_LABEL image did not contain its expected KERNEL and SYSTEM files."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		return 1
+	fi
+	cp "$_libreelec_flash/KERNEL" /tmp/nb-linux
+
+	if ! $WGET "$LIBREELEC_INIT_URL" -O "$_libreelec_overlay/init" >/tmp/nb-libreelec-init.log 2>&1; then
+		nb_error "Could not download the $LIBREELEC_LABEL init overlay source.\nSee /tmp/nb-libreelec-init.log for details."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		rm -f /tmp/nb-linux
+		return 1
+	fi
+	if ! awk '
+		{
+			gsub(/@KERNEL_NAME@/, "KERNEL")
+			gsub(/@DISTRONAME@/, "LibreELEC")
+			gsub(/@SYSTEM_SIZE@/, "1024")
+			print
+		}
+		/^mount_flash\(\) \{/ && !inserted {
+			print "  if [ \"$boot\" = \"NETBOOTCD\" ]; then"
+			print "    progress \"Mounting embedded NetbootCD-Neo LibreELEC installer media\""
+			print "    /usr/bin/busybox mount --bind /.netbootcd/flash /flash || error \"mount_flash\" \"Could not bind embedded installer media\""
+			print "    return"
+			print "  fi"
+			inserted = 1
+		}
+		END {
+			if (!inserted)
+				exit 1
+		}
+	' "$_libreelec_overlay/init" >"$_libreelec_overlay/init.new"; then
+		nb_error "Could not patch the $LIBREELEC_LABEL init overlay."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		rm -f /tmp/nb-linux
+		return 1
+	fi
+	mv "$_libreelec_overlay/init.new" "$_libreelec_overlay/init"
+	chmod 755 "$_libreelec_overlay/init"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $LIBREELEC_LABEL installer files into the initrd.\n\nThis can take a while." 7 70 || true
+	# LibreELEC Generic accepts zstd external initramfs archives; use one to
+	# override init and bind its extracted installer files as /flash.
+	if ! ( cd "$_libreelec_overlay" && find . | cpio -o -H newc | zstd -q -1 -c >/tmp/nb-initrd ); then
+		nb_error "Could not create the $LIBREELEC_LABEL initrd overlay."
+		[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+		rm -rf "$_libreelec_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-libreelec-7z.log /tmp/nb-libreelec-dd.log /tmp/nb-libreelec-gzip.log /tmp/nb-libreelec-init.log /tmp/nb-libreelec-mount.log
+	[ -n "$_libreelec_mounted" ] && umount "$_libreelec_work" 2>/dev/null || true
+	rm -rf "$_libreelec_work"
 	return 0
 }
 
@@ -4768,6 +5350,19 @@ COYOTE_ISO_URL=
 COYOTE_LABEL=
 COYOTE_KERNEL_PATH=
 COYOTE_INITRD_PATH=
+NUTYX_ISO_URL=
+NUTYX_LABEL=
+NUTYX_KERNEL_PATH=
+NUTYX_INITRD_PATH=
+NUTYX_ROOTFS_PATH=
+SALIX_ISO_URL=
+SALIX_LABEL=
+SALIX_KERNEL_PATH=
+SALIX_INITRD_PATH=
+VENOM_ISO_URL=
+VENOM_LABEL=
+VENOM_KERNEL_PATH=
+VENOM_INITRD_PATH=
 PUPPY_ISO_URL=
 PUPPY_LABEL=
 PUPPY_KERNEL_PATH=
@@ -4780,6 +5375,9 @@ EASYOS_INITRD_PATH=
 EASYOS_WKG_IMAGE_PATH=
 EASYOS_WKG_UUID=
 EASYOS_WKG_DIR=
+LIBREELEC_IMG_URL=
+LIBREELEC_LABEL=
+LIBREELEC_INIT_URL=
 ARCHISO_ISO_URL=
 ARCHISO_LABEL=
 ARCHISO_KERNEL_PATH=
@@ -5050,6 +5648,8 @@ if [ $DISTRO = "debianlive" ];then
 	crowz-fluxbox "CROWZ 5.0.1 Fluxbox" \
 	crowz-jwm "CROWZ 5.0.1 JWM" \
 	emmabuntus-de6-core "Emmabuntus DE6 Core" \
+	enux-533 "ENux 5.3.3 Xfce" \
+	exegnu-daedalus "Exe GNU/Linux Daedalus Trinity" \
 	locos-24 "Loc-OS 24" \
 	mauna-christian "Mauna Linux 25.2 Christian Edition" \
 	minios-standard "MiniOS 5.1.1 Standard" \
@@ -5083,12 +5683,14 @@ if [ $DISTRO = "antixmx" ];then
 fi
 
 if [ "$DISTRO" = "communitylive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 14 \
+	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 16 \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
 	easyos-excalibur "EasyOS Excalibur 7.3.3" \
+	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
+	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
@@ -5096,7 +5698,9 @@ if [ "$DISTRO" = "communitylive" ];then
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
 	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
-	solus-xfce "Solus Xfce 2026-04-18" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
+	solus-xfce "Solus Xfce 2026-04-18" \
+	venom-base-sysv-20260320 "Venom Linux Base SysV 2026-03-20" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
 	community_live_iso_setup "$VERSION" || return
@@ -5495,6 +6099,21 @@ elif [ -n "${COYOTE_ISO_URL:-}" ]; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-coyote.iso
 		return 1
 	fi
+elif [ -n "${NUTYX_ISO_URL:-}" ]; then
+	if ! nutyx_prepare_from_iso "$NUTYX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-nutyx.iso
+		return 1
+	fi
+elif [ -n "${SALIX_ISO_URL:-}" ]; then
+	if ! salix_prepare_from_iso "$SALIX_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-salix.iso
+		return 1
+	fi
+elif [ -n "${VENOM_ISO_URL:-}" ]; then
+	if ! venom_prepare_from_iso "$VENOM_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-venom.iso
+		return 1
+	fi
 elif [ -n "${PUPPY_ISO_URL:-}" ]; then
 	if ! puppy_prepare_from_iso "$PUPPY_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-puppy.iso
@@ -5503,6 +6122,11 @@ elif [ -n "${PUPPY_ISO_URL:-}" ]; then
 elif [ -n "${EASYOS_IMG_URL:-}" ]; then
 	if ! easyos_prepare_from_img "$EASYOS_IMG_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-easyos.img
+		return 1
+	fi
+elif [ -n "${LIBREELEC_IMG_URL:-}" ]; then
+	if ! libreelec_prepare_from_img "$LIBREELEC_IMG_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd
 		return 1
 	fi
 elif [ -n "${ISO_BOOT_URL:-}" ]; then
