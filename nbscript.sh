@@ -142,6 +142,15 @@ porteux_iso_setup ()
 	echo -n "$5 " >>/tmp/nb-options
 }
 
+porteus_iso_setup ()
+{
+	PORTEUS_LABEL="$1"
+	PORTEUS_ISO_URL="$2"
+	PORTEUS_KERNEL_PATH="$3"
+	PORTEUS_INITRD_PATH="$4"
+	echo -n "$5 " >>/tmp/nb-options
+}
+
 chimera_iso_setup ()
 {
 	CHIMERA_LABEL="$1"
@@ -303,6 +312,14 @@ community_live_iso_setup ()
 				"boot/syslinux/vmlinuz" \
 				"boot/syslinux/initrd.zst" \
 				"kvm.enable_virt_at_load=0" || return
+			;;
+		porteus-xfce-501)
+			porteus_iso_setup \
+				"Porteus 5.01 Xfce" \
+				"https://ftp.nluug.nl/os/Linux/distr/porteus/x86_64/current/Porteus-XFCE-v5.01-x86_64.iso" \
+				"boot/syslinux/vmlinuz" \
+				"boot/syslinux/initrd.xz" \
+				"nomagic base_only norootcopy" || return
 			;;
 		chimera-base)
 			chimera_iso_setup \
@@ -1319,67 +1336,150 @@ porteux_repack_initrd_with_iso ()
 	return 0
 }
 
-porteux_prepare_from_iso ()
+porteus_family_prepare_from_iso ()
 {
-	_porteux_iso_url="$1"
-	_porteux_work="/tmp/nb-porteux-work"
-	_porteux_iso="$_porteux_work/nb-porteux.iso"
-	_porteux_boot="$_porteux_work/boot"
+	_porteus_family_label="$1"
+	_porteus_family_iso_url="$2"
+	_porteus_family_kernel_path="$3"
+	_porteus_family_initrd_path="$4"
+	_porteus_family_tag="$5"
+	_porteus_family_repack="$6"
+	_porteus_family_work="/tmp/nb-$_porteus_family_tag-work"
+	_porteus_family_iso="$_porteus_family_work/nb-$_porteus_family_tag.iso"
+	_porteus_family_boot="$_porteus_family_work/boot"
+	_porteus_family_log="/tmp/nb-$_porteus_family_tag"
 
-	if ! _porteux_7z=$(artix_7z_cmd); then
-		nb_error "7zip is required to extract $PORTEUX_LABEL ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+	if ! _porteus_family_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $_porteus_family_label ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
 		return 1
 	fi
 
-	if grep -q " $_porteux_work " /proc/mounts 2>/dev/null; then
-		umount "$_porteux_work" 2>/dev/null || true
+	if grep -q " $_porteus_family_work " /proc/mounts 2>/dev/null; then
+		umount "$_porteus_family_work" 2>/dev/null || true
 	fi
 	rm -f /tmp/nb-linux /tmp/nb-initrd
-	rm -rf "$_porteux_work"
-	mkdir -p "$_porteux_boot"
-	_porteux_mounted=
-	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_porteux_work" 2>/tmp/nb-porteux-mount.log; then
-		_porteux_mounted=1
-		mkdir -p "$_porteux_boot"
+	rm -rf "$_porteus_family_work"
+	mkdir -p "$_porteus_family_boot"
+	_porteus_family_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_porteus_family_work" 2>"$_porteus_family_log-mount.log"; then
+		_porteus_family_mounted=1
+		mkdir -p "$_porteus_family_boot"
 	fi
 
-	if ! wgetgauge "$_porteux_iso_url" "$_porteux_iso" "Downloading $PORTEUX_LABEL ISO"; then
-		nb_error "Could not download $PORTEUX_LABEL ISO from:\n\n$_porteux_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
-		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
-		rm -rf "$_porteux_work"
+	if ! wgetgauge "$_porteus_family_iso_url" "$_porteus_family_iso" "Downloading $_porteus_family_label ISO"; then
+		nb_error "Could not download $_porteus_family_label ISO from:\n\n$_porteus_family_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_porteus_family_mounted" ] && umount "$_porteus_family_work" 2>/dev/null || true
+		rm -rf "$_porteus_family_work"
 		return 1
 	fi
 
-	if ! "$_porteux_7z" e -y -o"$_porteux_boot" "$_porteux_iso" "$PORTEUX_KERNEL_PATH" "$PORTEUX_INITRD_PATH" >/tmp/nb-porteux-7z.log 2>&1; then
-		nb_error "Could not extract $PORTEUX_LABEL boot files from the ISO.\nSee /tmp/nb-porteux-7z.log for details."
-		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
-		rm -rf "$_porteux_work"
+	if ! "$_porteus_family_7z" e -y -o"$_porteus_family_boot" "$_porteus_family_iso" "$_porteus_family_kernel_path" "$_porteus_family_initrd_path" >"$_porteus_family_log-7z.log" 2>&1; then
+		nb_error "Could not extract $_porteus_family_label boot files from the ISO.\nSee $_porteus_family_log-7z.log for details."
+		[ -n "$_porteus_family_mounted" ] && umount "$_porteus_family_work" 2>/dev/null || true
+		rm -rf "$_porteus_family_work"
 		return 1
 	fi
-	_porteux_kernel_file="${PORTEUX_KERNEL_PATH##*/}"
-	_porteux_initrd_file="${PORTEUX_INITRD_PATH##*/}"
-	if [ ! -s "$_porteux_boot/$_porteux_kernel_file" ] || [ ! -s "$_porteux_boot/$_porteux_initrd_file" ]; then
-		nb_error "The $PORTEUX_LABEL ISO did not contain its expected kernel and initramfs."
-		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
-		rm -rf "$_porteux_work"
+	_porteus_family_kernel_file="${_porteus_family_kernel_path##*/}"
+	_porteus_family_initrd_file="${_porteus_family_initrd_path##*/}"
+	if [ ! -s "$_porteus_family_boot/$_porteus_family_kernel_file" ] || [ ! -s "$_porteus_family_boot/$_porteus_family_initrd_file" ]; then
+		nb_error "The $_porteus_family_label ISO did not contain its expected kernel and initramfs."
+		[ -n "$_porteus_family_mounted" ] && umount "$_porteus_family_work" 2>/dev/null || true
+		rm -rf "$_porteus_family_work"
 		return 1
 	fi
 
-	mv "$_porteux_boot/$_porteux_kernel_file" /tmp/nb-linux
-	mv "$_porteux_boot/$_porteux_initrd_file" /tmp/nb-initrd
-	rm -rf "$_porteux_boot"
+	mv "$_porteus_family_boot/$_porteus_family_kernel_file" /tmp/nb-linux
+	mv "$_porteus_family_boot/$_porteus_family_initrd_file" /tmp/nb-initrd
+	rm -rf "$_porteus_family_boot"
 
 	dialog --backtitle "$TITLE" --infobox \
-		"Embedding the $PORTEUX_LABEL ISO into the initrd.\n\nThis can take a while." 7 70 || true
-	if ! porteux_repack_initrd_with_iso "$_porteux_iso"; then
-		[ -n "$_porteux_mounted" ] && umount "$_porteux_work" 2>/dev/null || true
-		rm -rf "$_porteux_work"
+		"Embedding the $_porteus_family_label ISO into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! "$_porteus_family_repack" "$_porteus_family_iso"; then
+		[ -n "$_porteus_family_mounted" ] && umount "$_porteus_family_work" 2>/dev/null || true
+		rm -rf "$_porteus_family_work"
 		rm -f /tmp/nb-linux /tmp/nb-initrd
 		return 1
 	fi
 
-	rm -f /tmp/nb-porteux-7z.log /tmp/nb-porteux-mount.log /tmp/nb-porteux-cpio.log
+	rm -f "$_porteus_family_log-7z.log" "$_porteus_family_log-mount.log" "$_porteus_family_log-cpio.log"
 	return 0
+}
+
+porteux_prepare_from_iso ()
+{
+	porteus_family_prepare_from_iso "$PORTEUX_LABEL" "$1" "$PORTEUX_KERNEL_PATH" "$PORTEUX_INITRD_PATH" porteux porteux_repack_initrd_with_iso
+}
+
+porteus_repack_initrd_with_iso ()
+{
+	_porteus_iso="$1"
+	_porteus_parent="${_porteus_iso%/*}"
+	_porteus_tree="$_porteus_parent/initrd-work"
+	_porteus_repacked="$_porteus_parent/nb-initrd.repacked"
+	_porteus_final="$_porteus_parent/nb-initrd"
+
+	if ! command -v xz >/dev/null 2>&1; then
+		nb_error "$PORTEUS_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_porteus_tree" "$_porteus_repacked" "$_porteus_final"
+	mkdir -p "$_porteus_tree"
+	if ! ( xz -dc /tmp/nb-initrd | ( cd "$_porteus_tree" && cpio -idmu ) ) 2>/tmp/nb-porteus-cpio.log; then
+		nb_error "Could not unpack the $PORTEUS_LABEL initramfs.\nSee /tmp/nb-porteus-cpio.log for details."
+		rm -rf "$_porteus_tree"
+		return 1
+	fi
+	if [ ! -s "$_porteus_tree/linuxrc" ]; then
+		nb_error "Could not find the $PORTEUS_LABEL initramfs startup script."
+		rm -rf "$_porteus_tree"
+		return 1
+	fi
+
+	mkdir -p "$_porteus_tree/netbootcd"
+	if ! mv "$_porteus_iso" "$_porteus_tree/netbootcd/porteus.iso"; then
+		nb_error "Could not embed the $PORTEUS_LABEL ISO into the initramfs."
+		rm -rf "$_porteus_tree"
+		return 1
+	fi
+
+	if ! awk '
+		$0 == "elif [ $ISO ]; then CFGDEV=/mnt/isoloop" && !patched {
+			print "elif [ -f /netbootcd/porteus.iso ]; then CFGDEV=/mnt/isoloop"
+			print "\tmkdir -p /mnt/isoloop"
+			print "\tmount -o loop /netbootcd/porteus.iso /mnt/isoloop"
+			print "\tISOSRC=/netbootcd/porteus.iso"
+			print "\tISO=/netbootcd/porteus.iso"
+			print "elif [ $ISO ]; then CFGDEV=/mnt/isoloop"
+			patched=1
+			next
+		}
+		{ print }
+		END { if (!patched) exit 1 }
+	' "$_porteus_tree/linuxrc" >"$_porteus_tree/linuxrc.new"; then
+		nb_error "Could not patch the $PORTEUS_LABEL initramfs media search."
+		rm -rf "$_porteus_tree"
+		return 1
+	fi
+	mv "$_porteus_tree/linuxrc.new" "$_porteus_tree/linuxrc"
+	chmod 755 "$_porteus_tree/linuxrc"
+
+	if ! ( cd "$_porteus_tree" && find . | cpio -o -H newc | xz -0 -C crc32 -c >"$_porteus_repacked" ); then
+		nb_error "Could not repack the $PORTEUS_LABEL xz initramfs."
+		rm -rf "$_porteus_tree"
+		return 1
+	fi
+
+	rm -rf "$_porteus_tree"
+	mv "$_porteus_repacked" "$_porteus_final"
+	rm -f /tmp/nb-initrd
+	ln -s "$_porteus_final" /tmp/nb-initrd
+	return 0
+}
+
+porteus_prepare_from_iso ()
+{
+	porteus_family_prepare_from_iso "$PORTEUS_LABEL" "$1" "$PORTEUS_KERNEL_PATH" "$PORTEUS_INITRD_PATH" porteus porteus_repack_initrd_with_iso
 }
 
 chimera_repack_initrd_with_iso ()
@@ -5342,6 +5442,10 @@ PORTEUX_ISO_URL=
 PORTEUX_LABEL=
 PORTEUX_KERNEL_PATH=
 PORTEUX_INITRD_PATH=
+PORTEUS_ISO_URL=
+PORTEUS_LABEL=
+PORTEUS_KERNEL_PATH=
+PORTEUS_INITRD_PATH=
 CHIMERA_ISO_URL=
 CHIMERA_LABEL=
 CHIMERA_KERNEL_PATH=
@@ -5696,6 +5800,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
 	pikaos-niri "PikaOS 4.0 Niri" \
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
+	porteus-xfce-501 "Porteus 5.01 Xfce" \
 	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
@@ -6087,6 +6192,11 @@ elif [ -n "${PIKA_ISO_URL:-}" ]; then
 elif [ -n "${PORTEUX_ISO_URL:-}" ]; then
 	if ! porteux_prepare_from_iso "$PORTEUX_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-porteux.iso
+		return 1
+	fi
+elif [ -n "${PORTEUS_ISO_URL:-}" ]; then
+	if ! porteus_prepare_from_iso "$PORTEUS_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-porteus.iso
 		return 1
 	fi
 elif [ -n "${CHIMERA_ISO_URL:-}" ]; then
