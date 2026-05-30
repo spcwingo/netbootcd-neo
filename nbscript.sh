@@ -214,6 +214,16 @@ community_live_iso_setup ()
 		adelie-inst-beta6)
 			adelie_iso_setup || return
 			;;
+		cachyos-desktop-260426)
+			archiso_live_iso_setup \
+				"CachyOS Desktop 260426" \
+				"https://build.cachyos.org/ISO/desktop/260426/cachyos-desktop-linux-260426.iso" \
+				"arch/boot/x86_64/vmlinuz-linux-cachyos" \
+				"arch/boot/x86_64/initramfs-linux-cachyos.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.sha512" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
+			;;
 		pikaos-gnome)
 			pika_iso_setup \
 				"PikaOS GNOME 4.0" \
@@ -298,6 +308,16 @@ community_live_iso_setup ()
 				"boot/kernel-618" \
 				"boot/initrd-618" \
 				"boot/NuTyX.squashfs" || return
+			;;
+		obarun-minimal-20260430)
+			archiso_live_iso_setup \
+				"Obarun Minimal 2026.04.30" \
+				"https://cloud.server.obarun.org/iso/2026.04.30/obarun-2026.04.30-x86_64.iso" \
+				"arch/boot/x86_64/vmlinuz" \
+				"arch/boot/x86_64/archiso.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.md5" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=4G" || return
 			;;
 		salixlive-xfce-150)
 			salix_iso_setup \
@@ -5881,6 +5901,7 @@ fi
 if [ "$DISTRO" = "communitylive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 16 \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
+	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
 	easyos-excalibur "EasyOS Excalibur 7.3.3" \
@@ -5888,6 +5909,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
+	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
