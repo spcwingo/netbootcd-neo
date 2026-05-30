@@ -151,6 +151,15 @@ porteus_iso_setup ()
 	echo -n "$5 " >>/tmp/nb-options
 }
 
+nemesis_iso_setup ()
+{
+	NEMESIS_LABEL="$1"
+	NEMESIS_ISO_URL="$2"
+	NEMESIS_KERNEL_PATH="$3"
+	NEMESIS_INITRD_PATH="$4"
+	echo -n "$5 " >>/tmp/nb-options
+}
+
 chimera_iso_setup ()
 {
 	CHIMERA_LABEL="$1"
@@ -317,6 +326,14 @@ community_live_iso_setup ()
 			porteus_iso_setup \
 				"Porteus 5.01 Xfce" \
 				"https://ftp.nluug.nl/os/Linux/distr/porteus/x86_64/current/Porteus-XFCE-v5.01-x86_64.iso" \
+				"boot/syslinux/vmlinuz" \
+				"boot/syslinux/initrd.xz" \
+				"nomagic base_only norootcopy" || return
+			;;
+		nemesis-lxde-2510)
+			nemesis_iso_setup \
+				"Nemesis Linux 25.10 LXDE" \
+				"https://phoenixnap.dl.sourceforge.net/project/nemesis-linux/ISO/25.10/Nemesis-v25.10-LXDE-x86_64.iso" \
 				"boot/syslinux/vmlinuz" \
 				"boot/syslinux/initrd.xz" \
 				"nomagic base_only norootcopy" || return
@@ -1480,6 +1497,77 @@ porteus_repack_initrd_with_iso ()
 porteus_prepare_from_iso ()
 {
 	porteus_family_prepare_from_iso "$PORTEUS_LABEL" "$1" "$PORTEUS_KERNEL_PATH" "$PORTEUS_INITRD_PATH" porteus porteus_repack_initrd_with_iso
+}
+
+nemesis_repack_initrd_with_iso ()
+{
+	_nemesis_iso="$1"
+	_nemesis_parent="${_nemesis_iso%/*}"
+	_nemesis_tree="$_nemesis_parent/initrd-work"
+	_nemesis_repacked="$_nemesis_parent/nb-initrd.repacked"
+	_nemesis_final="$_nemesis_parent/nb-initrd"
+
+	if ! command -v xz >/dev/null 2>&1; then
+		nb_error "$NEMESIS_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_nemesis_tree" "$_nemesis_repacked" "$_nemesis_final"
+	mkdir -p "$_nemesis_tree"
+	if ! ( xz -dc /tmp/nb-initrd | ( cd "$_nemesis_tree" && cpio -idmu ) ) 2>/tmp/nb-nemesis-cpio.log; then
+		nb_error "Could not unpack the $NEMESIS_LABEL initramfs.\nSee /tmp/nb-nemesis-cpio.log for details."
+		rm -rf "$_nemesis_tree"
+		return 1
+	fi
+	if [ ! -s "$_nemesis_tree/linuxrc" ]; then
+		nb_error "Could not find the $NEMESIS_LABEL initramfs startup script."
+		rm -rf "$_nemesis_tree"
+		return 1
+	fi
+
+	mkdir -p "$_nemesis_tree/netbootcd"
+	if ! mv "$_nemesis_iso" "$_nemesis_tree/netbootcd/nemesis.iso"; then
+		nb_error "Could not embed the $NEMESIS_LABEL ISO into the initramfs."
+		rm -rf "$_nemesis_tree"
+		return 1
+	fi
+
+	if ! awk '
+		$0 == "elif [ $ISO ]; then SGNDEV=/mnt/isoloop" && !patched {
+			print "elif [ -f /netbootcd/nemesis.iso ]; then SGNDEV=/mnt/isoloop"
+			print "\tmkdir -p /mnt/isoloop"
+			print "\tmount -o loop /netbootcd/nemesis.iso /mnt/isoloop"
+			print "\tISO=/netbootcd/nemesis.iso"
+			print "elif [ $ISO ]; then SGNDEV=/mnt/isoloop"
+			patched=1
+			next
+		}
+		{ print }
+		END { if (!patched) exit 1 }
+	' "$_nemesis_tree/linuxrc" >"$_nemesis_tree/linuxrc.new"; then
+		nb_error "Could not patch the $NEMESIS_LABEL initramfs media search."
+		rm -rf "$_nemesis_tree"
+		return 1
+	fi
+	mv "$_nemesis_tree/linuxrc.new" "$_nemesis_tree/linuxrc"
+	chmod 755 "$_nemesis_tree/linuxrc"
+
+	if ! ( cd "$_nemesis_tree" && find . | cpio -o -H newc | xz -0 -C crc32 -c >"$_nemesis_repacked" ); then
+		nb_error "Could not repack the $NEMESIS_LABEL xz initramfs."
+		rm -rf "$_nemesis_tree"
+		return 1
+	fi
+
+	rm -rf "$_nemesis_tree"
+	mv "$_nemesis_repacked" "$_nemesis_final"
+	rm -f /tmp/nb-initrd
+	ln -s "$_nemesis_final" /tmp/nb-initrd
+	return 0
+}
+
+nemesis_prepare_from_iso ()
+{
+	porteus_family_prepare_from_iso "$NEMESIS_LABEL" "$1" "$NEMESIS_KERNEL_PATH" "$NEMESIS_INITRD_PATH" nemesis nemesis_repack_initrd_with_iso
 }
 
 chimera_repack_initrd_with_iso ()
@@ -5446,6 +5534,10 @@ PORTEUS_ISO_URL=
 PORTEUS_LABEL=
 PORTEUS_KERNEL_PATH=
 PORTEUS_INITRD_PATH=
+NEMESIS_ISO_URL=
+NEMESIS_LABEL=
+NEMESIS_KERNEL_PATH=
+NEMESIS_INITRD_PATH=
 CHIMERA_ISO_URL=
 CHIMERA_LABEL=
 CHIMERA_KERNEL_PATH=
@@ -5794,6 +5886,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	easyos-excalibur "EasyOS Excalibur 7.3.3" \
 	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
+	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
@@ -6197,6 +6290,11 @@ elif [ -n "${PORTEUX_ISO_URL:-}" ]; then
 elif [ -n "${PORTEUS_ISO_URL:-}" ]; then
 	if ! porteus_prepare_from_iso "$PORTEUS_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-porteus.iso
+		return 1
+	fi
+elif [ -n "${NEMESIS_ISO_URL:-}" ]; then
+	if ! nemesis_prepare_from_iso "$NEMESIS_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-nemesis.iso
 		return 1
 	fi
 elif [ -n "${CHIMERA_ISO_URL:-}" ]; then
