@@ -229,6 +229,16 @@ community_live_iso_setup ()
 		adelie-inst-beta6)
 			adelie_iso_setup || return
 			;;
+		acreetionos-cinnamon-10)
+			archiso_live_iso_setup \
+				"AcreetionOS 1.0 Cinnamon" \
+				"https://ftp2.osuosl.org/pub/acreetionos/AcreetionOS-1.0-x86_64.iso" \
+				"arch/boot/x86_64/vmlinuz-linux" \
+				"arch/boot/x86_64/initramfs-linux.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.sha512" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
+			;;
 		fatdog64-903)
 			iso_boot_setup \
 				"https://distro.ibiblio.org/fatdog/iso/Fatdog64-903.iso" \
@@ -291,6 +301,16 @@ community_live_iso_setup ()
 				"https://iso.pika-os.com/PikaOS-Nest-COSMIC-4.0-amd64-v3-26.04.04-1.iso" \
 				"PikaOS-Nest-COSMIC-4.0-amd64-v3-26.04.04-1.iso" \
 				"PSC 26.04.04 1" || return
+			;;
+		prismlinux-20260505)
+			archiso_live_iso_setup \
+				"PrismLinux 2026.05.05" \
+				"https://repository.prismlinux.org/ISO/2026.05.05/PrismLinux-Desktop-2026.05.05-x86_64.iso" \
+				"prismlinux/boot/x86_64/vmlinuz-linux-lts" \
+				"prismlinux/boot/x86_64/initramfs-linux-lts.img" \
+				"prismlinux/x86_64/airootfs.sfs" \
+				"prismlinux/x86_64/airootfs.sha512" \
+				"archisobasedir=prismlinux arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes nvidia-drm.modeset=1" || return
 			;;
 		solus-xfce)
 			dracut_live_iso_setup \
@@ -362,6 +382,16 @@ community_live_iso_setup ()
 				"boot/vmlinuz" \
 				"boot/initrd.gz" \
 				"max_loop=255 vga=791 locale=en_US.utf8 keymap=us useswap=no copy2ram=no tz=Etc/GMT hwc=localtime runlevel=4" || return
+			;;
+		sdesk-quartz-202510)
+			archiso_live_iso_setup \
+				"SDesk Quartz 2025.10" \
+				"https://stevestudios.net/wp-content/uploads/2025/10/sdesk-2025.10.17-quartz-x86_64.iso" \
+				"sdesk/boot/x86_64/vmlinuz-linux" \
+				"sdesk/boot/x86_64/initramfs-linux.img" \
+				"sdesk/x86_64/airootfs.sfs" \
+				"sdesk/x86_64/airootfs.sha512" \
+				"archisobasedir=sdesk arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
 		venom-base-sysv-20260320)
 			venom_iso_setup \
@@ -5935,7 +5965,8 @@ if [ $DISTRO = "antixmx" ];then
 fi
 
 if [ "$DISTRO" = "communitylive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 18 \
+	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 21 \
+	acreetionos-cinnamon-10 "AcreetionOS 1.0 Cinnamon" \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
@@ -5954,10 +5985,12 @@ if [ "$DISTRO" = "communitylive" ];then
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
 	pikaos-niri "PikaOS 4.0 Niri" \
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
+	prismlinux-20260505 "PrismLinux 2026.05.05" \
 	porteus-xfce-501 "Porteus 5.01 Xfce" \
 	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
+	sdesk-quartz-202510 "SDesk Quartz 2025.10" \
 	solus-xfce "Solus Xfce 2026-04-18" \
 	venom-base-sysv-20260320 "Venom Linux Base SysV 2026-03-20" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
