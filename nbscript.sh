@@ -239,6 +239,16 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
+		bredos-20251027)
+			archiso_live_iso_setup \
+				"BredOS 2025.10.27" \
+				"https://github.com/BredOS/BredOS-iso/releases/download/2025-10-27/BredOS-2025.10.27-x86_64.iso" \
+				"arch/boot/x86_64/vmlinuz-linux" \
+				"arch/boot/x86_64/initramfs-linux.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.sha512" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G nvme_load=yes i915.modeset=1 radeon.modeset=1 nouveau.modeset=1 nvidia-drm.modeset=0 module_blacklist=pcspkr,nvidia,nvidia_uvm,nvidia_drm,nvidia_modeset" || return
+			;;
 		fatdog64-903)
 			iso_boot_setup \
 				"https://distro.ibiblio.org/fatdog/iso/Fatdog64-903.iso" \
@@ -374,6 +384,16 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sfs" \
 				"arch/x86_64/airootfs.md5" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=4G" || return
+			;;
+		parabola-cli-202204)
+			parabola_iso_setup \
+				"Parabola GNU/Linux-libre 2022.04 CLI netinstall" \
+				"http://mirror.math.princeton.edu/pub/parabola/iso/x86_64-systemd-cli-2022.04/parabola-x86_64-systemd-cli-2022.04-netinstall.iso" \
+				"parabola/boot/x86_64/vmlinuz" \
+				"parabola/boot/x86_64/parabolaiso.img" \
+				"parabola/x86_64/root-image.fs.sfs" \
+				"parabola/aitab" \
+				"parabolaisobasedir=parabola parabolaisolabel=PARA_202205 arch=x86_64 copytoram=n checksum=n cowspace_size=50%" || return
 			;;
 		salixlive-xfce-150)
 			salix_iso_setup \
@@ -511,6 +531,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="http://ddl.bunsenlabs.org/ddl/carbon-1-260211-amd64.hybrid.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=bunsenlabs"
 			;;
+		crunchbangplusplus-120)
+			DEBIAN_LIVE_LABEL="CrunchBang++ 12.0"
+			DEBIAN_LIVE_ISO_URL="https://github.com/CBPP/cbpp/releases/download/v12.0/cbpp-12.0-amd64-20230611.iso"
+			DEBIAN_LIVE_OPTIONS="username=live hostname=crunchbangplusplus"
+			;;
 		crowz-openbox)
 			DEBIAN_LIVE_LABEL="CROWZ 5.0.1 Openbox"
 			DEBIAN_LIVE_ISO_URL="http://netactuate.dl.sourceforge.net/project/crowz/crowz-5.0.1-daedalus_2024.02-ob-amd64.iso?viasf=1&fid=c2b2d7d6505e5406"
@@ -546,6 +571,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="Exe GNU/Linux Daedalus Trinity"
 			DEBIAN_LIVE_ISO_URL="http://master.dl.sourceforge.net/project/exegnulinux/iso/daedalus/exegnu64_daedalus-20250511.iso?viasf=1"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=exegnu nocomponents=xinit locales=en_US.UTF-8"
+			;;
+		lmde-7-cinnamon)
+			DEBIAN_LIVE_LABEL="LMDE 7 Cinnamon"
+			DEBIAN_LIVE_ISO_URL="http://mirrors.edge.kernel.org/linuxmint/debian/lmde-7-cinnamon-64bit.iso"
+			DEBIAN_LIVE_OPTIONS="username=mint hostname=lmde"
 			;;
 		locos-24)
 			DEBIAN_LIVE_LABEL="Loc-OS 24"
@@ -644,7 +674,7 @@ debian_live_iso_setup ()
 				DEBIAN_LIVE_OPTIONS="$DEBIAN_LIVE_OPTIONS modprobe.blacklist=video module_blacklist=video"
 			fi
 			;;
-		enux-*|exegnu-*)
+		crunchbangplusplus-*|enux-*|exegnu-*)
 			DEBIAN_LIVE_MODE=embed
 			;;
 		refracta-*)
@@ -2641,6 +2671,264 @@ archiso_prepare_from_iso ()
 	rm -f "$_archiso_iso" "$_archiso_rootfs" "$_archiso_checksum" /tmp/nb-archiso-7z.log /tmp/nb-archiso-mount.log
 	[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
 	rm -rf "$_archiso_work"
+	return 0
+}
+
+parabola_iso_setup ()
+{
+	PARABOLA_LABEL="$1"
+	PARABOLA_ISO_URL="$2"
+	PARABOLA_KERNEL_PATH="$3"
+	PARABOLA_INITRD_PATH="$4"
+	PARABOLA_ROOTFS_PATH="$5"
+	PARABOLA_AITAB_PATH="$6"
+	echo -n "$7 " >>/tmp/nb-options
+}
+
+parabola_repack_initrd_with_rootfs ()
+{
+	_parabola_rootfs="$1"
+	_parabola_aitab="$2"
+	_parabola_work="/tmp/nb-parabola-initrd-work"
+	_parabola_repacked="/tmp/nb-initrd.parabola"
+
+	if ! _parabola_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $PARABOLA_LABEL initramfs compression format."
+		return 1
+	fi
+	_parabola_format="${_parabola_main_info%% *}"
+	_parabola_main_offset="${_parabola_main_info#* }"
+
+	if [ "$_parabola_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$PARABOLA_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_parabola_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$PARABOLA_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_parabola_work" "$_parabola_repacked" /tmp/nb-initrd.new
+	mkdir -p "$_parabola_work"
+
+	case "$_parabola_format" in
+		gzip)
+			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_parabola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PARABOLA_LABEL gzip initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_parabola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PARABOLA_LABEL zstd initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_parabola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PARABOLA_LABEL xz initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_parabola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PARABOLA_LABEL cpio initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$_parabola_work/parabola/x86_64" "$_parabola_work/hooks"
+	if ! mv "$_parabola_rootfs" "$_parabola_work/parabola/x86_64/root-image.fs.sfs"; then
+		nb_error "Could not embed the $PARABOLA_LABEL root filesystem."
+		rm -rf "$_parabola_work"
+		return 1
+	fi
+	if ! mv "$_parabola_aitab" "$_parabola_work/parabola/aitab"; then
+		nb_error "Could not embed the $PARABOLA_LABEL aitab file."
+		rm -rf "$_parabola_work"
+		return 1
+	fi
+
+	cat >"$_parabola_work/hooks/netbootcd_parabola" <<'EOFP'
+#!/usr/bin/ash
+
+run_hook() {
+    _netbootcd_basedir="${parabolaisobasedir:-parabola}"
+    if [ -f "/${_netbootcd_basedir}/aitab" ] && [ -f "/${_netbootcd_basedir}/x86_64/root-image.fs.sfs" ]; then
+        copytoram=n
+        mount_handler="netbootcd_parabola_mount_handler"
+    fi
+}
+
+netbootcd_parabola_mount_handler() {
+    newroot="${1}"
+
+    msg ":: Using NetbootCD embedded Parabola root filesystem"
+    mkdir -p /run/parabolaiso/bootmnt
+    if ! mountpoint -q /run/parabolaiso/bootmnt; then
+        mount -o bind / /run/parabolaiso/bootmnt || {
+            echo "ERROR: could not bind initramfs for embedded Parabola root"
+            launch_interactive_shell
+        }
+    fi
+
+    parabolaisodevice=/
+    copytoram=n
+    parabolaiso_mount_handler "$newroot"
+}
+EOFP
+	chmod 755 "$_parabola_work/hooks/netbootcd_parabola"
+
+	if [ -f "$_parabola_work/config" ] && ! grep -q 'netbootcd_parabola' "$_parabola_work/config"; then
+		if grep -q '^HOOKS="' "$_parabola_work/config"; then
+			if ! sed 's/^HOOKS="\([^"]*\)"/HOOKS="\1 netbootcd_parabola"/' "$_parabola_work/config" >"$_parabola_work/config.new"; then
+				nb_error "Could not update the $PARABOLA_LABEL initramfs hook list."
+				rm -rf "$_parabola_work" "$_parabola_repacked" "$_parabola_work/config.new"
+				return 1
+			fi
+			mv "$_parabola_work/config.new" "$_parabola_work/config"
+		else
+			printf '\nHOOKS="${HOOKS} netbootcd_parabola"\n' >>"$_parabola_work/config"
+		fi
+	fi
+
+	case "$_parabola_format" in
+		gzip)
+			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc | gzip -1 -c >"$_parabola_repacked" ); then
+				nb_error "Could not repack the $PARABOLA_LABEL gzip initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc | zstd -q -c >"$_parabola_repacked" ); then
+				nb_error "Could not repack the $PARABOLA_LABEL zstd initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_parabola_repacked" ); then
+				nb_error "Could not repack the $PARABOLA_LABEL xz initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc >"$_parabola_repacked" ); then
+				nb_error "Could not repack the $PARABOLA_LABEL cpio initramfs."
+				rm -rf "$_parabola_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_parabola_main_offset" -gt 0 ]; then
+		if ! head -c "$_parabola_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $PARABOLA_LABEL early initramfs prefix."
+			rm -rf "$_parabola_work" "$_parabola_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_parabola_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $PARABOLA_LABEL initramfs."
+		rm -rf "$_parabola_work" "$_parabola_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_parabola_work" "$_parabola_repacked"
+	return 0
+}
+
+parabola_prepare_from_iso ()
+{
+	_parabola_iso_url="$1"
+	_parabola_work="/tmp/nb-parabola-work"
+	_parabola_iso="$_parabola_work/nb-parabola.iso"
+	_parabola_boot="$_parabola_work/boot"
+	_parabola_rootfs="$_parabola_work/root-image.fs.sfs"
+	_parabola_aitab="$_parabola_work/aitab"
+
+	if ! _parabola_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $PARABOLA_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_parabola_work " /proc/mounts 2>/dev/null; then
+		umount "$_parabola_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_parabola_work" /tmp/nb-parabola-initrd-work /tmp/nb-initrd.parabola /tmp/nb-initrd.new
+	mkdir -p "$_parabola_boot"
+	_parabola_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_parabola_work" 2>/tmp/nb-parabola-mount.log; then
+		_parabola_mounted=1
+		mkdir -p "$_parabola_boot"
+	fi
+
+	if ! wgetgauge "$_parabola_iso_url" "$_parabola_iso" "Downloading $PARABOLA_LABEL ISO"; then
+		nb_error "Could not download $PARABOLA_LABEL ISO from:\n\n$_parabola_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+		rm -rf "$_parabola_work"
+		return 1
+	fi
+
+	if ! "$_parabola_7z" e -y -o"$_parabola_boot" "$_parabola_iso" "$PARABOLA_KERNEL_PATH" "$PARABOLA_INITRD_PATH" >/tmp/nb-parabola-7z.log 2>&1; then
+		nb_error "Could not extract $PARABOLA_LABEL boot files from the ISO.\nSee /tmp/nb-parabola-7z.log for details."
+		[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+		rm -rf "$_parabola_work"
+		return 1
+	fi
+	_parabola_kernel_file="${PARABOLA_KERNEL_PATH##*/}"
+	_parabola_initrd_file="${PARABOLA_INITRD_PATH##*/}"
+	if [ ! -s "$_parabola_boot/$_parabola_kernel_file" ] || [ ! -s "$_parabola_boot/$_parabola_initrd_file" ]; then
+		nb_error "The $PARABOLA_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+		rm -rf "$_parabola_work"
+		return 1
+	fi
+	mv "$_parabola_boot/$_parabola_kernel_file" /tmp/nb-linux
+	mv "$_parabola_boot/$_parabola_initrd_file" /tmp/nb-initrd
+	rm -rf "$_parabola_boot"
+
+	if ! "$_parabola_7z" e -y -o"$_parabola_work" "$_parabola_iso" "$PARABOLA_ROOTFS_PATH" "$PARABOLA_AITAB_PATH" >>/tmp/nb-parabola-7z.log 2>&1; then
+		nb_error "Could not extract $PARABOLA_LABEL live filesystem from the ISO.\nSee /tmp/nb-parabola-7z.log for details."
+		[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+		rm -rf "$_parabola_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	_parabola_rootfs_file="${PARABOLA_ROOTFS_PATH##*/}"
+	_parabola_aitab_file="${PARABOLA_AITAB_PATH##*/}"
+	if [ ! -s "$_parabola_work/$_parabola_rootfs_file" ] || [ ! -s "$_parabola_work/$_parabola_aitab_file" ]; then
+		nb_error "The $PARABOLA_LABEL ISO did not contain its expected live filesystem files."
+		[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+		rm -rf "$_parabola_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	mv "$_parabola_work/$_parabola_rootfs_file" "$_parabola_rootfs"
+	mv "$_parabola_work/$_parabola_aitab_file" "$_parabola_aitab"
+	rm -f "$_parabola_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $PARABOLA_LABEL root filesystem into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! parabola_repack_initrd_with_rootfs "$_parabola_rootfs" "$_parabola_aitab"; then
+		[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+		rm -rf "$_parabola_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.parabola
+		return 1
+	fi
+
+	rm -f "$_parabola_iso" "$_parabola_rootfs" "$_parabola_aitab" /tmp/nb-parabola-7z.log /tmp/nb-parabola-mount.log
+	[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
+	rm -rf "$_parabola_work"
 	return 0
 }
 
@@ -5662,12 +5950,18 @@ LIBREELEC_LABEL=
 LIBREELEC_INIT_URL=
 ARCHISO_ISO_URL=
 ARCHISO_LABEL=
-ARCHISO_KERNEL_PATH=
-ARCHISO_INITRD_PATH=
-ARCHISO_ROOTFS_PATH=
-ARCHISO_CHECKSUM_PATH=
-MOCACCINO_ISO_URL=
-MOCACCINO_LABEL=
+	ARCHISO_KERNEL_PATH=
+	ARCHISO_INITRD_PATH=
+	ARCHISO_ROOTFS_PATH=
+	ARCHISO_CHECKSUM_PATH=
+	PARABOLA_ISO_URL=
+	PARABOLA_LABEL=
+	PARABOLA_KERNEL_PATH=
+	PARABOLA_INITRD_PATH=
+	PARABOLA_ROOTFS_PATH=
+	PARABOLA_AITAB_PATH=
+	MOCACCINO_ISO_URL=
+	MOCACCINO_LABEL=
 MOCACCINO_KERNEL_PATH=
 MOCACCINO_INITRD_PATH=
 MOCACCINO_ROOTFS_PATH=
@@ -5684,7 +5978,6 @@ dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 20 \
 ubuntu "Ubuntu" \
 ubuntuflavor "Ubuntu flavors and derivatives" \
 debian "Debian GNU/Linux" \
-debiandaily "Debian GNU/Linux - daily installers" \
 devuan "Devuan GNU/Linux" \
 debianlive "Debian-based live installers" \
 antixmx "antiX / MX Linux live installers" \
@@ -5774,6 +6067,9 @@ if [ $DISTRO = "ubuntuflavor" ];then
 		funos-24.04 "FunOS 24.04.4 LTS Calamares" \
 		kde-neon-user "KDE neon User Edition" \
 		linuxlite-7.8 "Linux Lite 7.8" \
+		mint-22.3-cinnamon "Linux Mint 22.3 Cinnamon" \
+		mint-22.3-mate "Linux Mint 22.3 MATE" \
+		mint-22.3-xfce "Linux Mint 22.3 Xfce" \
 		rhino-2025.4 "Rhino Linux 2025.4" \
 	trisquel-mini-12 "Trisquel Mini 12.0" \
 	trisquel-netinst-12 "Trisquel 12.0 NetInstall" \
@@ -5828,6 +6124,27 @@ if [ $DISTRO = "ubuntuflavor" ];then
 			"http://master.dl.sourceforge.net/project/linux-lite/7.8/linux-lite-7.8-64bit.iso?viasf=1" \
 			"username=linuxlite hostname=linuxlite" \
 			"http://downloads.sourceforge.net/project/linux-lite/7.8/linux-lite-7.8-64bit.iso" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "mint-22.3-cinnamon" ]; then
+		ubuntu_casper_iso_setup \
+			"Linux Mint 22.3 Cinnamon" \
+			"http://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso" \
+			"username=mint hostname=mint" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "mint-22.3-mate" ]; then
+		ubuntu_casper_iso_setup \
+			"Linux Mint 22.3 MATE" \
+			"http://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso" \
+			"username=mint hostname=mint" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "mint-22.3-xfce" ]; then
+		ubuntu_casper_iso_setup \
+			"Linux Mint 22.3 Xfce" \
+			"http://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso" \
+			"username=mint hostname=mint" || return
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
 	elif [ "$VERSION" = "rhino-2025.4" ]; then
@@ -5896,17 +6213,6 @@ if [ $DISTRO = "debian" ];then
 	INITRDURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
 fi
-if [ $DISTRO = "debiandaily" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
-	high "Default" \
-	medium "Show installation menu" \
-	low "Expert mode" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	getversion || return 0
-	KERNELURL="http://d-i.debian.org/daily-images/amd64/daily/netboot/debian-installer/amd64/linux"
-	INITRDURL="http://d-i.debian.org/daily-images/amd64/daily/netboot/debian-installer/amd64/initrd.gz"
-	echo -n 'vga=normal quiet '>>/tmp/nb-options
-	echo -n "priority=$VERSION ">>/tmp/nb-options
-fi
 if [ $DISTRO = "devuan" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
  	excalibur "Devuan excalibur" \
@@ -5926,12 +6232,14 @@ if [ $DISTRO = "debianlive" ];then
 	butterbian-xfce "Butterbian Xfce 0.2.1" \
 	butterknife "Butterknife 0.1.11" \
 	bunsenlabs-carbon "BunsenLabs Carbon 1" \
+	crunchbangplusplus-120 "CrunchBang++ 12.0" \
 	crowz-openbox "CROWZ 5.0.1 Openbox" \
 	crowz-fluxbox "CROWZ 5.0.1 Fluxbox" \
 	crowz-jwm "CROWZ 5.0.1 JWM" \
 	emmabuntus-de6-core "Emmabuntus DE6 Core" \
 	enux-533 "ENux 5.3.3 Xfce" \
 	exegnu-daedalus "Exe GNU/Linux Daedalus Trinity" \
+	lmde-7-cinnamon "LMDE 7 Cinnamon" \
 	locos-24 "Loc-OS 24" \
 	mauna-christian "Mauna Linux 25.2 Christian Edition" \
 	minios-standard "MiniOS 5.1.1 Standard" \
@@ -5968,6 +6276,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 21 \
 	acreetionos-cinnamon-10 "AcreetionOS 1.0 Cinnamon" \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
+	bredos-20251027 "BredOS 2025.10.27" \
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
@@ -5977,9 +6286,10 @@ if [ "$DISTRO" = "communitylive" ];then
 		keskos-layer-v3 "KeskOS Layer v3" \
 		libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
 		mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
-		nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
+	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
+	parabola-cli-202204 "Parabola GNU/Linux-libre 2022.04 CLI netinstall" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
@@ -6361,14 +6671,19 @@ elif [ -n "${GUIX_ISO_URL:-}" ]; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-guix.iso
 		return 1
 	fi
-elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
-	if ! archiso_prepare_from_iso "$ARCHISO_ISO_URL"; then
-		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-archiso.iso
-		return 1
-	fi
-elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
-	if ! mocaccino_prepare_from_iso "$MOCACCINO_ISO_URL"; then
-		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-mocaccino.iso
+	elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
+		if ! archiso_prepare_from_iso "$ARCHISO_ISO_URL"; then
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-archiso.iso
+			return 1
+		fi
+	elif [ -n "${PARABOLA_ISO_URL:-}" ]; then
+		if ! parabola_prepare_from_iso "$PARABOLA_ISO_URL"; then
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-parabola.iso
+			return 1
+		fi
+	elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
+		if ! mocaccino_prepare_from_iso "$MOCACCINO_ISO_URL"; then
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-mocaccino.iso
 		return 1
 	fi
 elif [ -n "${PIKA_ISO_URL:-}" ]; then
