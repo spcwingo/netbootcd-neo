@@ -109,6 +109,21 @@ dracut_live_iso_setup ()
 	echo -n "root=live:/LiveOS/squashfs.img ro rd.live.image rd.live.overlay.overlayfs=1 rd.luks=0 rd.md=0 rd.dm=0 $3 " >>/tmp/nb-options
 }
 
+gobolinux_iso_setup ()
+{
+	DEBIAN_LIVE_LABEL="GoboLinux 017.01"
+	DEBIAN_LIVE_ISO_URL="https://gobolinux.neonsys.org/017.01-ISO/GoboLinux-017.01-x86_64.iso"
+	DEBIAN_LIVE_BOOT_URL="$DEBIAN_LIVE_ISO_URL"
+	DEBIAN_LIVE_MODE=embed
+	DEBIAN_LIVE_KERNEL_PATHS="isolinux/kernel"
+	DEBIAN_LIVE_INITRD_PATHS="isolinux/initramfs"
+	DEBIAN_LIVE_ROOTFS_PATHS="gobolinux-live.squashfs"
+	DEBIAN_LIVE_EMBED_ROOTFS_PATH="gobolinux-live.img"
+	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
+	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
+	echo -n "root=live:/gobolinux-live.img Boot=LiveCD vt.default_utf8=1 audit=0 rd.live.image rd.live.dir=/ rd.live.squashimg=gobolinux-live.img rd.live.overlay.overlayfs rd.luks=0 rd.lvm=0 rd.md=0 rd.dm=0 rd.live.ram=0 " >>/tmp/nb-options
+}
+
 adelie_iso_setup ()
 {
 	DEBIAN_LIVE_LABEL="Adelie Linux 1.0-beta6 Installer"
@@ -214,6 +229,14 @@ community_live_iso_setup ()
 		adelie-inst-beta6)
 			adelie_iso_setup || return
 			;;
+		fatdog64-903)
+			iso_boot_setup \
+				"https://distro.ibiblio.org/fatdog/iso/Fatdog64-903.iso" \
+				"Fatdog64 903" \
+				"vmlinuz" \
+				"initrd"
+			echo -n "rootfstype=ramfs savefile=none " >>/tmp/nb-options
+			;;
 		cachyos-desktop-260426)
 			archiso_live_iso_setup \
 				"CachyOS Desktop 260426" \
@@ -223,6 +246,16 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sfs" \
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
+			;;
+		keskos-layer-v3)
+			archiso_live_iso_setup \
+				"KeskOS Layer v3" \
+				"https://downloads.keskos.org/release/layer-v3/keskos-layer-v3.iso" \
+				"keskos/boot/x86_64/vmlinuz-linux" \
+				"keskos/boot/x86_64/initramfs-linux.img" \
+				"keskos/x86_64/airootfs.erofs" \
+				"keskos/x86_64/airootfs.sha512" \
+				"archisobasedir=keskos arch=x86_64 copytoram=n checksum=n cow_spacesize=10G" || return
 			;;
 		pikaos-gnome)
 			pika_iso_setup \
@@ -294,6 +327,9 @@ community_live_iso_setup ()
 				"1.img" \
 				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
 				"easyos/" || return
+			;;
+		gobolinux-01701)
+			gobolinux_iso_setup || return
 			;;
 		libreelec-generic)
 			libreelec_img_setup \
@@ -5899,15 +5935,18 @@ if [ $DISTRO = "antixmx" ];then
 fi
 
 if [ "$DISTRO" = "communitylive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 16 \
+	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 18 \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
-	easyos-excalibur "EasyOS Excalibur 7.3.3" \
-	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
-	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
-	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
+		easyos-excalibur "EasyOS Excalibur 7.3.3" \
+		fatdog64-903 "Fatdog64 903" \
+		gobolinux-01701 "GoboLinux 017.01" \
+		keskos-layer-v3 "KeskOS Layer v3" \
+		libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
+		mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
+		nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
