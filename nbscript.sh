@@ -348,6 +348,18 @@ community_live_iso_setup ()
 				"adrv_dpupbw64_10.0.12.sfs" \
 				"bdrv_dpupbw64_10.0.12.sfs" || return
 			;;
+		puppy-trixiepup64-legacy-114)
+			puppy_iso_setup \
+				"TrixiePup64 Legacy 11.4" \
+				"https://distro.ibiblio.org/puppylinux/puppy-trixie/TrixiePup64/11.4/legacy/Trixiepup64_Legacy-11.4.iso" \
+				"vmlinuz" \
+				"initrd.gz" \
+				"puppy_trixiepup64_11.4.sfs" \
+				"zdrv_trixiepup64_11.4.sfs" \
+				"fdrv_trixiepup64_11.4.sfs" \
+				"adrv_trixiepup64_11.4.sfs" \
+				"bdrv_trixiepup64_11.4.sfs" || return
+			;;
 		easyos-excalibur)
 			easyos_img_setup \
 				"EasyOS Excalibur 7.3.3" \
@@ -360,6 +372,16 @@ community_live_iso_setup ()
 			;;
 		gobolinux-01701)
 			gobolinux_iso_setup || return
+			;;
+		hyperbola-milky-way-044)
+			hyperbola_iso_setup \
+				"Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
+				"https://repo.hyperbola.info:50000/other/live_images/gnu-plus-linux-libre/hyperbola-milky-way-v0.4.4/hyperbola-milky-way-v0.4.4-dual.iso" \
+				"hyperbola/boot/x86_64/vmlinuz" \
+				"hyperbola/boot/x86_64/initramfs-hyperiso.img" \
+				"hyperbola/x86_64/root-image.fs.sfs" \
+				"hyperbola/aitab" \
+				"hyperisobasedir=hyperbola hyperisolabel=HYPER_v044 arch=x86_64 copytoram=n checksum=n cowspace_size=50%" || return
 			;;
 		libreelec-generic)
 			libreelec_img_setup \
@@ -494,11 +516,6 @@ downloadandrun ()
 	nb_error "Downloading the newest NetbootCD-Neo script was not successful.\n\nURL:\n$_nbscript_url"
 	return "$_nbscript_rc"
 }
-
-DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
-DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
-DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
-DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
 
 debian_live_iso_setup ()
 {
@@ -2929,6 +2946,264 @@ parabola_prepare_from_iso ()
 	rm -f "$_parabola_iso" "$_parabola_rootfs" "$_parabola_aitab" /tmp/nb-parabola-7z.log /tmp/nb-parabola-mount.log
 	[ -n "$_parabola_mounted" ] && umount "$_parabola_work" 2>/dev/null || true
 	rm -rf "$_parabola_work"
+	return 0
+}
+
+hyperbola_iso_setup ()
+{
+	HYPERBOLA_LABEL="$1"
+	HYPERBOLA_ISO_URL="$2"
+	HYPERBOLA_KERNEL_PATH="$3"
+	HYPERBOLA_INITRD_PATH="$4"
+	HYPERBOLA_ROOTFS_PATH="$5"
+	HYPERBOLA_AITAB_PATH="$6"
+	echo -n "$7 " >>/tmp/nb-options
+}
+
+hyperbola_repack_initrd_with_rootfs ()
+{
+	_hyperbola_rootfs="$1"
+	_hyperbola_aitab="$2"
+	_hyperbola_work="/tmp/nb-hyperbola-initrd-work"
+	_hyperbola_repacked="/tmp/nb-initrd.hyperbola"
+
+	if ! _hyperbola_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $HYPERBOLA_LABEL initramfs compression format."
+		return 1
+	fi
+	_hyperbola_format="${_hyperbola_main_info%% *}"
+	_hyperbola_main_offset="${_hyperbola_main_info#* }"
+
+	if [ "$_hyperbola_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$HYPERBOLA_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_hyperbola_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$HYPERBOLA_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_hyperbola_work" "$_hyperbola_repacked" /tmp/nb-initrd.new
+	mkdir -p "$_hyperbola_work"
+
+	case "$_hyperbola_format" in
+		gzip)
+			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $HYPERBOLA_LABEL gzip initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $HYPERBOLA_LABEL zstd initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $HYPERBOLA_LABEL xz initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $HYPERBOLA_LABEL cpio initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$_hyperbola_work/hyperbola/x86_64" "$_hyperbola_work/hooks"
+	if ! mv "$_hyperbola_rootfs" "$_hyperbola_work/hyperbola/x86_64/root-image.fs.sfs"; then
+		nb_error "Could not embed the $HYPERBOLA_LABEL root filesystem."
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
+	if ! mv "$_hyperbola_aitab" "$_hyperbola_work/hyperbola/aitab"; then
+		nb_error "Could not embed the $HYPERBOLA_LABEL aitab file."
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
+
+	cat >"$_hyperbola_work/hooks/netbootcd_hyperbola" <<'EOFP'
+#!/usr/bin/ash
+
+run_hook() {
+    _netbootcd_basedir="${hyperisobasedir:-hyperbola}"
+    if [ -f "/${_netbootcd_basedir}/aitab" ] && [ -f "/${_netbootcd_basedir}/x86_64/root-image.fs.sfs" ]; then
+        copytoram=n
+        mount_handler="netbootcd_hyperbola_mount_handler"
+    fi
+}
+
+netbootcd_hyperbola_mount_handler() {
+    newroot="${1}"
+
+    msg ":: Using NetbootCD embedded Hyperbola root filesystem"
+    mkdir -p /run/hyperiso/bootmnt
+    if ! mountpoint -q /run/hyperiso/bootmnt; then
+        mount -o bind / /run/hyperiso/bootmnt || {
+            echo "ERROR: could not bind initramfs for embedded Hyperbola root"
+            launch_interactive_shell
+        }
+    fi
+
+    hyperisodevice=/
+    copytoram=n
+    hyperiso_mount_handler "$newroot"
+}
+EOFP
+	chmod 755 "$_hyperbola_work/hooks/netbootcd_hyperbola"
+
+	if [ -f "$_hyperbola_work/config" ] && ! grep -q 'netbootcd_hyperbola' "$_hyperbola_work/config"; then
+		if grep -q '^HOOKS="' "$_hyperbola_work/config"; then
+			if ! sed 's/^HOOKS="\([^"]*\)"/HOOKS="\1 netbootcd_hyperbola"/' "$_hyperbola_work/config" >"$_hyperbola_work/config.new"; then
+				nb_error "Could not update the $HYPERBOLA_LABEL initramfs hook list."
+				rm -rf "$_hyperbola_work" "$_hyperbola_repacked" "$_hyperbola_work/config.new"
+				return 1
+			fi
+			mv "$_hyperbola_work/config.new" "$_hyperbola_work/config"
+		else
+			printf '\nHOOKS="${HOOKS} netbootcd_hyperbola"\n' >>"$_hyperbola_work/config"
+		fi
+	fi
+
+	case "$_hyperbola_format" in
+		gzip)
+			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc | gzip -1 -c >"$_hyperbola_repacked" ); then
+				nb_error "Could not repack the $HYPERBOLA_LABEL gzip initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc | zstd -q -c >"$_hyperbola_repacked" ); then
+				nb_error "Could not repack the $HYPERBOLA_LABEL zstd initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_hyperbola_repacked" ); then
+				nb_error "Could not repack the $HYPERBOLA_LABEL xz initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc >"$_hyperbola_repacked" ); then
+				nb_error "Could not repack the $HYPERBOLA_LABEL cpio initramfs."
+				rm -rf "$_hyperbola_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_hyperbola_main_offset" -gt 0 ]; then
+		if ! head -c "$_hyperbola_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $HYPERBOLA_LABEL early initramfs prefix."
+			rm -rf "$_hyperbola_work" "$_hyperbola_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_hyperbola_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $HYPERBOLA_LABEL initramfs."
+		rm -rf "$_hyperbola_work" "$_hyperbola_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_hyperbola_work" "$_hyperbola_repacked"
+	return 0
+}
+
+hyperbola_prepare_from_iso ()
+{
+	_hyperbola_iso_url="$1"
+	_hyperbola_work="/tmp/nb-hyperbola-work"
+	_hyperbola_iso="$_hyperbola_work/nb-hyperbola.iso"
+	_hyperbola_boot="$_hyperbola_work/boot"
+	_hyperbola_rootfs="$_hyperbola_work/root-image.fs.sfs"
+	_hyperbola_aitab="$_hyperbola_work/aitab"
+
+	if ! _hyperbola_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $HYPERBOLA_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_hyperbola_work " /proc/mounts 2>/dev/null; then
+		umount "$_hyperbola_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_hyperbola_work" /tmp/nb-hyperbola-initrd-work /tmp/nb-initrd.hyperbola /tmp/nb-initrd.new
+	mkdir -p "$_hyperbola_boot"
+	_hyperbola_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_hyperbola_work" 2>/tmp/nb-hyperbola-mount.log; then
+		_hyperbola_mounted=1
+		mkdir -p "$_hyperbola_boot"
+	fi
+
+	if ! wgetgauge "$_hyperbola_iso_url" "$_hyperbola_iso" "Downloading $HYPERBOLA_LABEL ISO"; then
+		nb_error "Could not download $HYPERBOLA_LABEL ISO from:\n\n$_hyperbola_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
+
+	if ! "$_hyperbola_7z" e -y -o"$_hyperbola_boot" "$_hyperbola_iso" "$HYPERBOLA_KERNEL_PATH" "$HYPERBOLA_INITRD_PATH" >/tmp/nb-hyperbola-7z.log 2>&1; then
+		nb_error "Could not extract $HYPERBOLA_LABEL boot files from the ISO.\nSee /tmp/nb-hyperbola-7z.log for details."
+		[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
+	_hyperbola_kernel_file="${HYPERBOLA_KERNEL_PATH##*/}"
+	_hyperbola_initrd_file="${HYPERBOLA_INITRD_PATH##*/}"
+	if [ ! -s "$_hyperbola_boot/$_hyperbola_kernel_file" ] || [ ! -s "$_hyperbola_boot/$_hyperbola_initrd_file" ]; then
+		nb_error "The $HYPERBOLA_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
+	mv "$_hyperbola_boot/$_hyperbola_kernel_file" /tmp/nb-linux
+	mv "$_hyperbola_boot/$_hyperbola_initrd_file" /tmp/nb-initrd
+	rm -rf "$_hyperbola_boot"
+
+	if ! "$_hyperbola_7z" e -y -o"$_hyperbola_work" "$_hyperbola_iso" "$HYPERBOLA_ROOTFS_PATH" "$HYPERBOLA_AITAB_PATH" >>/tmp/nb-hyperbola-7z.log 2>&1; then
+		nb_error "Could not extract $HYPERBOLA_LABEL live filesystem from the ISO.\nSee /tmp/nb-hyperbola-7z.log for details."
+		[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+		rm -rf "$_hyperbola_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	_hyperbola_rootfs_file="${HYPERBOLA_ROOTFS_PATH##*/}"
+	_hyperbola_aitab_file="${HYPERBOLA_AITAB_PATH##*/}"
+	if [ ! -s "$_hyperbola_work/$_hyperbola_rootfs_file" ] || [ ! -s "$_hyperbola_work/$_hyperbola_aitab_file" ]; then
+		nb_error "The $HYPERBOLA_LABEL ISO did not contain its expected live filesystem files."
+		[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+		rm -rf "$_hyperbola_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	mv "$_hyperbola_work/$_hyperbola_rootfs_file" "$_hyperbola_rootfs"
+	mv "$_hyperbola_work/$_hyperbola_aitab_file" "$_hyperbola_aitab"
+	rm -f "$_hyperbola_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $HYPERBOLA_LABEL root filesystem into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! hyperbola_repack_initrd_with_rootfs "$_hyperbola_rootfs" "$_hyperbola_aitab"; then
+		[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+		rm -rf "$_hyperbola_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.hyperbola
+		return 1
+	fi
+
+	rm -f "$_hyperbola_iso" "$_hyperbola_rootfs" "$_hyperbola_aitab" /tmp/nb-hyperbola-7z.log /tmp/nb-hyperbola-mount.log
+	[ -n "$_hyperbola_mounted" ] && umount "$_hyperbola_work" 2>/dev/null || true
+	rm -rf "$_hyperbola_work"
 	return 0
 }
 
@@ -5960,6 +6235,12 @@ ARCHISO_LABEL=
 	PARABOLA_INITRD_PATH=
 	PARABOLA_ROOTFS_PATH=
 	PARABOLA_AITAB_PATH=
+	HYPERBOLA_ISO_URL=
+	HYPERBOLA_LABEL=
+	HYPERBOLA_KERNEL_PATH=
+	HYPERBOLA_INITRD_PATH=
+	HYPERBOLA_ROOTFS_PATH=
+	HYPERBOLA_AITAB_PATH=
 	MOCACCINO_ISO_URL=
 	MOCACCINO_LABEL=
 MOCACCINO_KERNEL_PATH=
@@ -6280,12 +6561,13 @@ if [ "$DISTRO" = "communitylive" ];then
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
-		easyos-excalibur "EasyOS Excalibur 7.3.3" \
-		fatdog64-903 "Fatdog64 903" \
-		gobolinux-01701 "GoboLinux 017.01" \
-		keskos-layer-v3 "KeskOS Layer v3" \
-		libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
-		mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
+	easyos-excalibur "EasyOS Excalibur 7.3.3" \
+	fatdog64-903 "Fatdog64 903" \
+	gobolinux-01701 "GoboLinux 017.01" \
+	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
+	keskos-layer-v3 "KeskOS Layer v3" \
+	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
+	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
@@ -6299,6 +6581,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	porteus-xfce-501 "Porteus 5.01 Xfce" \
 	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
+	puppy-trixiepup64-legacy-114 "TrixiePup64 Legacy 11.4" \
 	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
 	sdesk-quartz-202510 "SDesk Quartz 2025.10" \
 	solus-xfce "Solus Xfce 2026-04-18" \
@@ -6671,19 +6954,24 @@ elif [ -n "${GUIX_ISO_URL:-}" ]; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-guix.iso
 		return 1
 	fi
-	elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
-		if ! archiso_prepare_from_iso "$ARCHISO_ISO_URL"; then
-			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-archiso.iso
-			return 1
-		fi
-	elif [ -n "${PARABOLA_ISO_URL:-}" ]; then
-		if ! parabola_prepare_from_iso "$PARABOLA_ISO_URL"; then
-			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-parabola.iso
-			return 1
-		fi
-	elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
-		if ! mocaccino_prepare_from_iso "$MOCACCINO_ISO_URL"; then
-			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-mocaccino.iso
+elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
+	if ! archiso_prepare_from_iso "$ARCHISO_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-archiso.iso
+		return 1
+	fi
+elif [ -n "${PARABOLA_ISO_URL:-}" ]; then
+	if ! parabola_prepare_from_iso "$PARABOLA_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-parabola.iso
+		return 1
+	fi
+elif [ -n "${HYPERBOLA_ISO_URL:-}" ]; then
+	if ! hyperbola_prepare_from_iso "$HYPERBOLA_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-hyperbola.iso
+		return 1
+	fi
+elif [ -n "${MOCACCINO_ISO_URL:-}" ]; then
+	if ! mocaccino_prepare_from_iso "$MOCACCINO_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-mocaccino.iso
 		return 1
 	fi
 elif [ -n "${PIKA_ISO_URL:-}" ]; then
