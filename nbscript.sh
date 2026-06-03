@@ -362,12 +362,12 @@ community_live_iso_setup ()
 			;;
 		easyos-excalibur)
 			easyos_img_setup \
-				"EasyOS Excalibur 7.3.3" \
-				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.3/easy-7.3.3-amd64.img" \
+				"EasyOS Excalibur 7.3.7" \
+				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.7/easy-7.3.7-amd64.img" \
 				"easyos/vmlinuz" \
 				"easyos/initrd" \
 				"1.img" \
-				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
+				"auto" \
 				"easyos/" || return
 			;;
 		gobolinux-01701)
@@ -3693,7 +3693,35 @@ easyos_img_setup ()
 	EASYOS_WKG_IMAGE_PATH="$5"
 	EASYOS_WKG_UUID="$6"
 	EASYOS_WKG_DIR="$7"
-	echo -n "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
+	echo -n "rw intel_iommu=igfx_off wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
+}
+
+easyos_wkg_uuid_from_image ()
+{
+	_easyos_uuid_image="$1"
+	_easyos_uuid=
+	if command -v blkid >/dev/null 2>&1; then
+		_easyos_blkid=$(blkid "$_easyos_uuid_image" 2>/dev/null || true)
+		case "$_easyos_blkid" in
+			*' UUID="'*)
+				_easyos_uuid=${_easyos_blkid#* UUID=\"}
+				_easyos_uuid=${_easyos_uuid%%\"*}
+				;;
+			*' UUID='*)
+				_easyos_uuid=${_easyos_blkid#* UUID=}
+				_easyos_uuid=${_easyos_uuid%% *}
+				;;
+		esac
+	fi
+	if [ -z "$_easyos_uuid" ] && command -v od >/dev/null 2>&1; then
+		_easyos_uuid_hex=$(od -An -tx1 -j 1128 -N 16 "$_easyos_uuid_image" 2>/dev/null | sed 's/[	 ]//g')
+		case "$_easyos_uuid_hex" in
+			????????????????????????????????)
+				_easyos_uuid=$(printf '%s\n' "$_easyos_uuid_hex" | sed 's/^\(........\)\(....\)\(....\)\(....\)\(............\)$/\1-\2-\3-\4-\5/')
+				;;
+		esac
+	fi
+	printf '%s\n' "$_easyos_uuid"
 }
 
 easyos_repack_initrd_with_wkg_image ()
@@ -3963,6 +3991,17 @@ easyos_prepare_from_img ()
 		rm -rf "$_easyos_work"
 		return 1
 	fi
+	_easyos_wkg_uuid=$(easyos_wkg_uuid_from_image "$_easyos_wkg_image")
+	if [ -z "$_easyos_wkg_uuid" ] && [ "$EASYOS_WKG_UUID" != "auto" ]; then
+		_easyos_wkg_uuid="$EASYOS_WKG_UUID"
+	fi
+	if [ -z "$_easyos_wkg_uuid" ]; then
+		nb_error "Could not determine the $EASYOS_LABEL working image UUID."
+		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
+		rm -rf "$_easyos_work"
+		return 1
+	fi
+	echo -n "wkg_uuid=$_easyos_wkg_uuid " >>/tmp/nb-options
 	rm -f "$_easyos_img"
 
 	if ! "$_easyos_7z" e -y -o"$_easyos_boot" "$_easyos_wkg_image" "$EASYOS_KERNEL_PATH" "$EASYOS_INITRD_PATH" >>/tmp/nb-easyos-7z.log 2>&1; then
@@ -6288,8 +6327,6 @@ if [ $DISTRO = "ubuntu" ];then
 	questing "Ubuntu 25.10 (Subiquity)" \
 	noble "Ubuntu 24.04 LTS (Subiquity)" \
 	jammy "Ubuntu 22.04 LTS (Subiquity)" \
-	focal "Ubuntu 20.04 LTS" \
-	bionic "Ubuntu 18.04 LTS" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	if [ "$VERSION" = "noble" ]; then
@@ -6561,7 +6598,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
-	easyos-excalibur "EasyOS Excalibur 7.3.3" \
+	easyos-excalibur "EasyOS Excalibur 7.3.7" \
 	fatdog64-903 "Fatdog64 903" \
 	gobolinux-01701 "GoboLinux 017.01" \
 	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
@@ -6795,7 +6832,6 @@ if [ $DISTRO = "openeuler" ];then
 	24.03-LTS-SP3 "openEuler 24.03 LTS SP3" \
 	24.03-LTS-SP1 "openEuler 24.03 LTS SP1" \
 	24.03-LTS "openEuler 24.03 LTS" \
-	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
 	Manual "Manually enter a version to install (e.g. 24.03-LTS)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	dialog --inputbox "Where do you want to install openEuler from?" 8 70 "https://repo.openeuler.org/openEuler-$VERSION/everything/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
@@ -6885,7 +6921,7 @@ fi
 if [ $DISTRO = "rescue" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
 	gparted           "GParted Live 1.8.1-3" \
-	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
+	clonezilla-deb    "Clonezilla Live 3.3.2-31 testing (Debian-based)" \
 	rescuezilla       "Rescuezilla 2.6.1" \
 	4mlinux           "4MLinux 51.0" \
 	grml-full         "Grml Full 2026.04" \
@@ -6900,7 +6936,7 @@ if [ $DISTRO = "rescue" ];then
 		echo -n "boot=live fetch=$SQUASH union=overlay username=user vga=788" >>/tmp/nb-options
 	fi
 	if [ $DISTRO = "clonezilla-deb" ];then
-		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.1-35-1a41a72c"
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.2-31-8db01622"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
