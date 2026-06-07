@@ -88,7 +88,7 @@ ubuntu_casper_iso_setup ()
 	DEBIAN_LIVE_BOOT_URL="${4:-$2}"
 	DEBIAN_LIVE_MODE=casper-url
 	DEBIAN_LIVE_KERNEL_PATHS="casper/vmlinuz casper/vmlinuz.efi live/vmlinuz boot/vmlinuz boot/vmlinuz-*"
-	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst"
+	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst casper/initrd.zstd live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst live/initrd.zstd boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst boot/initrd.zstd"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
 	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
 	echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
@@ -221,6 +221,17 @@ venom_iso_setup ()
 	echo -n "ro quiet wait=15 " >>/tmp/nb-options
 }
 
+daphile_iso_setup ()
+{
+	DAPHILE_LABEL="$1"
+	DAPHILE_ISO_URL="$2"
+	DAPHILE_KERNEL_PATH="$3"
+	DAPHILE_INITRD_PATH="$4"
+	DAPHILE_ROOTFS_PATH="$5"
+	DAPHILE_VERSION_DIR="$6"
+	echo -n "daphile=$DAPHILE_VERSION_DIR vga=788 splash quiet panic=1 console=tty2 vt.global_cursor_default=0 i915.enable_fbc=0 threadirqs live " >>/tmp/nb-options
+}
+
 community_live_iso_setup ()
 {
 	_community_live_tag="$1"
@@ -248,6 +259,16 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sfs" \
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G nvme_load=yes i915.modeset=1 radeon.modeset=1 nouveau.modeset=1 nvidia-drm.modeset=0 module_blacklist=pcspkr,nvidia,nvidia_uvm,nvidia_drm,nvidia_modeset" || return
+			;;
+		ditana-09-beta)
+			archiso_live_iso_setup \
+				"Ditana GNU/Linux 0.9 Beta" \
+				"https://ditana.org/downloads/Ditana-0.9.0-Beta-x86_64.iso" \
+				"ditana/boot/x86_64/vmlinuz-linux" \
+				"ditana/boot/x86_64/initramfs-linux.img" \
+				"ditana/x86_64/airootfs.sfs" \
+				"ditana/x86_64/airootfs.sha512" \
+				"archisobasedir=ditana arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
 		fatdog64-903)
 			iso_boot_setup \
@@ -362,12 +383,12 @@ community_live_iso_setup ()
 			;;
 		easyos-excalibur)
 			easyos_img_setup \
-				"EasyOS Excalibur 7.3.7" \
-				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.7/easy-7.3.7-amd64.img" \
+				"EasyOS Excalibur 7.3.3" \
+				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.3/easy-7.3.3-amd64.img" \
 				"easyos/vmlinuz" \
 				"easyos/initrd" \
 				"1.img" \
-				"auto" \
+				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
 				"easyos/" || return
 			;;
 		gobolinux-01701)
@@ -480,6 +501,15 @@ community_live_iso_setup ()
 				"boot/vmlinuz" \
 				"boot/initramfs.gz" || return
 			;;
+		daphile-2505)
+			daphile_iso_setup \
+				"Daphile 25.05 x86_64" \
+				"https://www.daphile.com/firmware/stable/daphile-25.05-x86_64.iso" \
+				"boot/fw2505251549/kernel" \
+				"boot/fw2505251549/initrd" \
+				"boot/fw2505251549/rootfs" \
+				"fw2505251549" || return
+			;;
 		*)
 			nb_error "Unknown community live ISO entry: $_community_live_tag"
 			return 1
@@ -526,7 +556,7 @@ debian_live_iso_setup ()
 	DEBIAN_LIVE_MODE=fetch
 	DEBIAN_LIVE_OPTIONS=
 	DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
-	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.img-* boot/initrd-*"
+	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.zstd live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.zstd boot/initrd.img-* boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
@@ -588,6 +618,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="Exe GNU/Linux Daedalus Trinity"
 			DEBIAN_LIVE_ISO_URL="http://master.dl.sourceforge.net/project/exegnulinux/iso/daedalus/exegnu64_daedalus-20250511.iso?viasf=1"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=exegnu nocomponents=xinit locales=en_US.UTF-8"
+			;;
+		kanotix-towelfire-lxde)
+			DEBIAN_LIVE_LABEL="KANOTIX Towelfire LXDE"
+			DEBIAN_LIVE_ISO_URL="https://iso.kanotix.com/kanotix64-towelfire-nightly-LXDE.iso"
+			DEBIAN_LIVE_OPTIONS="username=kanotix hostname=kanotix"
 			;;
 		lmde-7-cinnamon)
 			DEBIAN_LIVE_LABEL="LMDE 7 Cinnamon"
@@ -3693,35 +3728,7 @@ easyos_img_setup ()
 	EASYOS_WKG_IMAGE_PATH="$5"
 	EASYOS_WKG_UUID="$6"
 	EASYOS_WKG_DIR="$7"
-	echo -n "rw intel_iommu=igfx_off wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
-}
-
-easyos_wkg_uuid_from_image ()
-{
-	_easyos_uuid_image="$1"
-	_easyos_uuid=
-	if command -v blkid >/dev/null 2>&1; then
-		_easyos_blkid=$(blkid "$_easyos_uuid_image" 2>/dev/null || true)
-		case "$_easyos_blkid" in
-			*' UUID="'*)
-				_easyos_uuid=${_easyos_blkid#* UUID=\"}
-				_easyos_uuid=${_easyos_uuid%%\"*}
-				;;
-			*' UUID='*)
-				_easyos_uuid=${_easyos_blkid#* UUID=}
-				_easyos_uuid=${_easyos_uuid%% *}
-				;;
-		esac
-	fi
-	if [ -z "$_easyos_uuid" ] && command -v od >/dev/null 2>&1; then
-		_easyos_uuid_hex=$(od -An -tx1 -j 1128 -N 16 "$_easyos_uuid_image" 2>/dev/null | sed 's/[	 ]//g')
-		case "$_easyos_uuid_hex" in
-			????????????????????????????????)
-				_easyos_uuid=$(printf '%s\n' "$_easyos_uuid_hex" | sed 's/^\(........\)\(....\)\(....\)\(....\)\(............\)$/\1-\2-\3-\4-\5/')
-				;;
-		esac
-	fi
-	printf '%s\n' "$_easyos_uuid"
+	echo -n "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
 }
 
 easyos_repack_initrd_with_wkg_image ()
@@ -3991,17 +3998,6 @@ easyos_prepare_from_img ()
 		rm -rf "$_easyos_work"
 		return 1
 	fi
-	_easyos_wkg_uuid=$(easyos_wkg_uuid_from_image "$_easyos_wkg_image")
-	if [ -z "$_easyos_wkg_uuid" ] && [ "$EASYOS_WKG_UUID" != "auto" ]; then
-		_easyos_wkg_uuid="$EASYOS_WKG_UUID"
-	fi
-	if [ -z "$_easyos_wkg_uuid" ]; then
-		nb_error "Could not determine the $EASYOS_LABEL working image UUID."
-		[ -n "$_easyos_mounted" ] && umount "$_easyos_work" 2>/dev/null || true
-		rm -rf "$_easyos_work"
-		return 1
-	fi
-	echo -n "wkg_uuid=$_easyos_wkg_uuid " >>/tmp/nb-options
 	rm -f "$_easyos_img"
 
 	if ! "$_easyos_7z" e -y -o"$_easyos_boot" "$_easyos_wkg_image" "$EASYOS_KERNEL_PATH" "$EASYOS_INITRD_PATH" >>/tmp/nb-easyos-7z.log 2>&1; then
@@ -4579,6 +4575,245 @@ antix_mx_prepare_from_iso ()
 	fi
 
 	rm -f "$_antix_mx_iso" /tmp/nb-antix-mx-7z.log
+	return 0
+}
+
+daphile_patch_init ()
+{
+	_daphile_init="$1"
+	_daphile_patched=0
+
+	rm -f "$_daphile_init.new"
+	while IFS= read -r _daphile_line || [ -n "$_daphile_line" ]; do
+		printf '%s\n' "$_daphile_line"
+		if [ "$_daphile_patched" -eq 0 ] && [ "$_daphile_line" = "mount_boot() {" ]; then
+			printf '%s\n' '	if [[ -f "/boot/boot/${daphile}/rootfs" && -e "/boot/boot/live" ]]'
+			printf '%s\n' '	then'
+			printf '%s\n' '		return 0'
+			printf '%s\n' '	fi'
+			_daphile_patched=1
+		fi
+	done <"$_daphile_init" >"$_daphile_init.new"
+
+	if [ "$_daphile_patched" -ne 1 ]; then
+		rm -f "$_daphile_init.new"
+		return 1
+	fi
+	mv "$_daphile_init.new" "$_daphile_init"
+	chmod 0755 "$_daphile_init"
+}
+
+daphile_initrd_unpacked ()
+{
+	[ -f "$1/init" ] && [ -f "$1/bin/busybox" ]
+}
+
+daphile_repack_initrd_with_rootfs ()
+{
+	_daphile_rootfs="$1"
+	_daphile_work="/tmp/nb-daphile-initrd-work"
+	_daphile_repacked="/tmp/nb-initrd.daphile"
+
+	if ! _daphile_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $DAPHILE_LABEL initramfs compression format."
+		return 1
+	fi
+	_daphile_format="${_daphile_main_info%% *}"
+	_daphile_main_offset="${_daphile_main_info#* }"
+
+	if [ "$_daphile_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$DAPHILE_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_daphile_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$DAPHILE_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_daphile_work" "$_daphile_repacked"
+	mkdir -p "$_daphile_work"
+
+	case "$_daphile_format" in
+		gzip)
+			if ! ( tail -c +"$(( _daphile_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_daphile_work" && cpio -idm 2>/tmp/nb-daphile-cpio.log ) ); then
+				if daphile_initrd_unpacked "$_daphile_work"; then
+					:
+				else
+					nb_error "Could not unpack the $DAPHILE_LABEL gzip initramfs."
+					rm -rf "$_daphile_work"
+					return 1
+				fi
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _daphile_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_daphile_work" && cpio -idm 2>/tmp/nb-daphile-cpio.log ) ); then
+				if daphile_initrd_unpacked "$_daphile_work"; then
+					:
+				else
+					nb_error "Could not unpack the $DAPHILE_LABEL zstd initramfs."
+					rm -rf "$_daphile_work"
+					return 1
+				fi
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _daphile_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_daphile_work" && cpio -idm 2>/tmp/nb-daphile-cpio.log ) ); then
+				if daphile_initrd_unpacked "$_daphile_work"; then
+					:
+				else
+					nb_error "Could not unpack the $DAPHILE_LABEL xz initramfs."
+					rm -rf "$_daphile_work"
+					return 1
+				fi
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _daphile_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_daphile_work" && cpio -idm 2>/tmp/nb-daphile-cpio.log ) ); then
+				if daphile_initrd_unpacked "$_daphile_work"; then
+					:
+				else
+					nb_error "Could not unpack the $DAPHILE_LABEL cpio initramfs."
+					rm -rf "$_daphile_work"
+					return 1
+				fi
+			fi
+			;;
+	esac
+
+	if [ ! -f "$_daphile_work/init" ]; then
+		nb_error "The $DAPHILE_LABEL initramfs did not contain /init."
+		rm -rf "$_daphile_work"
+		return 1
+	fi
+	if ! daphile_patch_init "$_daphile_work/init"; then
+		nb_error "Could not patch the $DAPHILE_LABEL boot media check."
+		rm -rf "$_daphile_work"
+		return 1
+	fi
+
+	mkdir -p "$_daphile_work/boot/boot/$DAPHILE_VERSION_DIR"
+	if ! cp "$_daphile_rootfs" "$_daphile_work/boot/boot/$DAPHILE_VERSION_DIR/rootfs"; then
+		nb_error "Could not embed the $DAPHILE_LABEL rootfs into the initramfs."
+		rm -rf "$_daphile_work"
+		return 1
+	fi
+	: >"$_daphile_work/boot/boot/live"
+
+	case "$_daphile_format" in
+		gzip)
+			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc | gzip -1 -c >"$_daphile_repacked" ); then
+				nb_error "Could not repack the $DAPHILE_LABEL gzip initramfs."
+				rm -rf "$_daphile_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc | zstd -q -c >"$_daphile_repacked" ); then
+				nb_error "Could not repack the $DAPHILE_LABEL zstd initramfs."
+				rm -rf "$_daphile_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_daphile_repacked" ); then
+				nb_error "Could not repack the $DAPHILE_LABEL xz initramfs."
+				rm -rf "$_daphile_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc >"$_daphile_repacked" ); then
+				nb_error "Could not repack the $DAPHILE_LABEL cpio initramfs."
+				rm -rf "$_daphile_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_daphile_main_offset" -gt 0 ]; then
+		if ! head -c "$_daphile_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $DAPHILE_LABEL early initramfs prefix."
+			rm -rf "$_daphile_work" "$_daphile_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_daphile_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $DAPHILE_LABEL initramfs."
+		rm -rf "$_daphile_work" "$_daphile_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_daphile_work" "$_daphile_repacked" /tmp/nb-daphile-cpio.log
+	return 0
+}
+
+daphile_prepare_from_iso ()
+{
+	_daphile_iso_url="$1"
+	_daphile_iso="/tmp/nb-daphile.iso"
+	_daphile_boot="/tmp/nb-daphile-boot"
+
+	if ! _daphile_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $DAPHILE_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd "$_daphile_iso"
+	rm -rf "$_daphile_boot" /tmp/nb-daphile-initrd-work /tmp/nb-initrd.daphile /tmp/nb-initrd.new
+	mkdir -p "$_daphile_boot"
+
+	if ! wgetgauge "$_daphile_iso_url" "$_daphile_iso" "Downloading $DAPHILE_LABEL ISO"; then
+		nb_error "Could not download $DAPHILE_LABEL ISO from:\n\n$_daphile_iso_url"
+		rm -f "$_daphile_iso"
+		rm -rf "$_daphile_boot"
+		return 1
+	fi
+
+	if ! "$_daphile_7z" e -y -o"$_daphile_boot" "$_daphile_iso" "$DAPHILE_KERNEL_PATH" "$DAPHILE_INITRD_PATH" "$DAPHILE_ROOTFS_PATH" >/tmp/nb-daphile-7z.log 2>&1; then
+		nb_error "Could not extract $DAPHILE_LABEL boot files from the ISO.\nSee /tmp/nb-daphile-7z.log for details."
+		rm -f "$_daphile_iso"
+		rm -rf "$_daphile_boot"
+		return 1
+	fi
+
+	_daphile_kernel_file="${DAPHILE_KERNEL_PATH##*/}"
+	_daphile_initrd_file="${DAPHILE_INITRD_PATH##*/}"
+	_daphile_rootfs_file="${DAPHILE_ROOTFS_PATH##*/}"
+
+	if [ ! -s "$_daphile_boot/$_daphile_kernel_file" ]; then
+		nb_error "The $DAPHILE_LABEL ISO did not contain $DAPHILE_KERNEL_PATH."
+		rm -f "$_daphile_iso"
+		rm -rf "$_daphile_boot"
+		return 1
+	fi
+	if [ ! -s "$_daphile_boot/$_daphile_initrd_file" ]; then
+		nb_error "The $DAPHILE_LABEL ISO did not contain $DAPHILE_INITRD_PATH."
+		rm -f "$_daphile_iso"
+		rm -rf "$_daphile_boot"
+		return 1
+	fi
+	if [ ! -s "$_daphile_boot/$_daphile_rootfs_file" ]; then
+		nb_error "The $DAPHILE_LABEL ISO did not contain $DAPHILE_ROOTFS_PATH."
+		rm -f "$_daphile_iso"
+		rm -rf "$_daphile_boot"
+		return 1
+	fi
+
+	mv "$_daphile_boot/$_daphile_kernel_file" /tmp/nb-linux
+	mv "$_daphile_boot/$_daphile_initrd_file" /tmp/nb-initrd
+	rm -f "$_daphile_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $DAPHILE_LABEL rootfs into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! daphile_repack_initrd_with_rootfs "$_daphile_boot/$_daphile_rootfs_file"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.daphile
+		rm -rf "$_daphile_boot" /tmp/nb-daphile-initrd-work
+		return 1
+	fi
+
+	rm -f /tmp/nb-daphile-7z.log
+	rm -rf "$_daphile_boot"
 	return 0
 }
 
@@ -6243,6 +6478,12 @@ SALIX_ISO_URL=
 SALIX_LABEL=
 SALIX_KERNEL_PATH=
 SALIX_INITRD_PATH=
+DAPHILE_ISO_URL=
+DAPHILE_LABEL=
+DAPHILE_KERNEL_PATH=
+DAPHILE_INITRD_PATH=
+DAPHILE_ROOTFS_PATH=
+DAPHILE_VERSION_DIR=
 VENOM_ISO_URL=
 VENOM_LABEL=
 VENOM_KERNEL_PATH=
@@ -6327,6 +6568,8 @@ if [ $DISTRO = "ubuntu" ];then
 	questing "Ubuntu 25.10 (Subiquity)" \
 	noble "Ubuntu 24.04 LTS (Subiquity)" \
 	jammy "Ubuntu 22.04 LTS (Subiquity)" \
+	focal "Ubuntu 20.04 LTS" \
+	bionic "Ubuntu 18.04 LTS" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	if [ "$VERSION" = "noble" ]; then
@@ -6557,6 +6800,7 @@ if [ $DISTRO = "debianlive" ];then
 	emmabuntus-de6-core "Emmabuntus DE6 Core" \
 	enux-533 "ENux 5.3.3 Xfce" \
 	exegnu-daedalus "Exe GNU/Linux Daedalus Trinity" \
+	kanotix-towelfire-lxde "KANOTIX Towelfire LXDE" \
 	lmde-7-cinnamon "LMDE 7 Cinnamon" \
 	locos-24 "Loc-OS 24" \
 	mauna-christian "Mauna Linux 25.2 Christian Edition" \
@@ -6598,7 +6842,9 @@ if [ "$DISTRO" = "communitylive" ];then
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
-	easyos-excalibur "EasyOS Excalibur 7.3.7" \
+	daphile-2505 "Daphile 25.05 x86_64 (music server)" \
+	ditana-09-beta "Ditana GNU/Linux 0.9 Beta" \
+	easyos-excalibur "EasyOS Excalibur 7.3.3" \
 	fatdog64-903 "Fatdog64 903" \
 	gobolinux-01701 "GoboLinux 017.01" \
 	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
@@ -6832,6 +7078,7 @@ if [ $DISTRO = "openeuler" ];then
 	24.03-LTS-SP3 "openEuler 24.03 LTS SP3" \
 	24.03-LTS-SP1 "openEuler 24.03 LTS SP1" \
 	24.03-LTS "openEuler 24.03 LTS" \
+	22.03-LTS-SP4 "openEuler 22.03 LTS SP4" \
 	Manual "Manually enter a version to install (e.g. 24.03-LTS)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
 	dialog --inputbox "Where do you want to install openEuler from?" 8 70 "https://repo.openeuler.org/openEuler-$VERSION/everything/x86_64" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
@@ -6921,7 +7168,7 @@ fi
 if [ $DISTRO = "rescue" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
 	gparted           "GParted Live 1.8.1-3" \
-	clonezilla-deb    "Clonezilla Live 3.3.2-31 testing (Debian-based)" \
+	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
 	rescuezilla       "Rescuezilla 2.6.1" \
 	4mlinux           "4MLinux 51.0" \
 	grml-full         "Grml Full 2026.04" \
@@ -6936,7 +7183,7 @@ if [ $DISTRO = "rescue" ];then
 		echo -n "boot=live fetch=$SQUASH union=overlay username=user vga=788" >>/tmp/nb-options
 	fi
 	if [ $DISTRO = "clonezilla-deb" ];then
-		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.2-31-8db01622"
+		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.1-35-1a41a72c"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
@@ -7048,6 +7295,11 @@ elif [ -n "${NUTYX_ISO_URL:-}" ]; then
 elif [ -n "${SALIX_ISO_URL:-}" ]; then
 	if ! salix_prepare_from_iso "$SALIX_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-salix.iso
+		return 1
+	fi
+elif [ -n "${DAPHILE_ISO_URL:-}" ]; then
+	if ! daphile_prepare_from_iso "$DAPHILE_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-daphile.iso
 		return 1
 	fi
 elif [ -n "${VENOM_ISO_URL:-}" ]; then
