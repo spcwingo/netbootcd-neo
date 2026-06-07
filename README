@@ -6,8 +6,9 @@ The original NetbootCD script that this is based upon is written by Isaac Schemm
 
 Unlike the original NetbootCD, NetbootCD-Neo supports both BIOS and UEFI systems.
 
-To build run as root:
+To build, run as root or use fakeroot:
 
-cd ~/Downloads/netbootcd-neo && ./Build.sh
+cd ~/Downloads/netbootcd-neo
+sudo ./Build.sh or fakeroot ./Build.sh 
 
-Of course that's assuming the extracted folder is in your Downloads directory. Adjust as necessary. The resulting ISOs are hybrid so they may be written to optical discs or USB drives.
+Of course that's assuming the extracted folder is in your Downloads directory. Adjust as necessary.

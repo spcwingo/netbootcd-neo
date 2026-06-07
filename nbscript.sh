@@ -100,8 +100,8 @@ dracut_live_iso_setup ()
 	DEBIAN_LIVE_ISO_URL="$2"
 	DEBIAN_LIVE_BOOT_URL="$2"
 	DEBIAN_LIVE_MODE=embed
-	DEBIAN_LIVE_KERNEL_PATHS="images/pxeboot/vmlinuz isolinux/vmlinuz boot/kernel boot/vmlinuz boot/vmlinuz-*"
-	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img isolinux/initrd.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
+	DEBIAN_LIVE_KERNEL_PATHS="images/pxeboot/vmlinuz boot/x86_64/loader/linux isolinux/vmlinuz boot/kernel boot/vmlinuz boot/vmlinuz-*"
+	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img boot/x86_64/loader/initrd isolinux/initrd.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
@@ -383,13 +383,14 @@ community_live_iso_setup ()
 			;;
 		easyos-excalibur)
 			easyos_img_setup \
-				"EasyOS Excalibur 7.3.3" \
-				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.3/easy-7.3.3-amd64.img" \
+				"EasyOS Excalibur 7.3.8" \
+				"https://distro.ibiblio.org/easyos/amd64/releases/excalibur/2026/7.3.8/easy-7.3.8-amd64.img" \
 				"easyos/vmlinuz" \
 				"easyos/initrd" \
 				"1.img" \
-				"b2d2dedb-f348-4de6-b425-d34cbcb1c889" \
-				"easyos/" || return
+				"af274dcb-219b-4746-ba5d-78e6bf358770" \
+				"easyos/" \
+				"easyos2" || return
 			;;
 		gobolinux-01701)
 			gobolinux_iso_setup || return
@@ -442,6 +443,14 @@ community_live_iso_setup ()
 			salix_iso_setup \
 				"SalixLive64 Xfce 15.0" \
 				"http://phoenixnap.dl.sourceforge.net/project/salix/15.0/salixlive64-xfce-15.0.iso" \
+				"boot/vmlinuz" \
+				"boot/initrd.gz" \
+				"max_loop=255 vga=791 locale=en_US.utf8 keymap=us useswap=no copy2ram=no tz=Etc/GMT hwc=localtime runlevel=4" || return
+			;;
+		slackel-openbox-80)
+			salix_iso_setup \
+				"Slackel 8.0 Openbox" \
+				"https://downloads.sourceforge.net/project/slackel/openbox/slackellive64-openbox-8.0.iso" \
 				"boot/vmlinuz" \
 				"boot/initrd.gz" \
 				"max_loop=255 vga=791 locale=en_US.utf8 keymap=us useswap=no copy2ram=no tz=Etc/GMT hwc=localtime runlevel=4" || return
@@ -3728,7 +3737,10 @@ easyos_img_setup ()
 	EASYOS_WKG_IMAGE_PATH="$5"
 	EASYOS_WKG_UUID="$6"
 	EASYOS_WKG_DIR="$7"
-	echo -n "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
+	EASYOS_WKG_LABEL="$8"
+	echo -n "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID " >>/tmp/nb-options
+	[ -n "$EASYOS_WKG_LABEL" ] && echo -n "wkg_label=$EASYOS_WKG_LABEL " >>/tmp/nb-options
+	echo -n "wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
 }
 
 easyos_repack_initrd_with_wkg_image ()
@@ -4168,6 +4180,22 @@ ARTIX_ISO_BASE="http://mirrors.ocf.berkeley.edu/artix-iso"
 VOID_ISO_BASE="http://repo-fastly.voidlinux.org/live/current"
 ALTLINUX_ISO_BASE="http://nightly.altlinux.org/sisyphus/current"
 GUIX_ISO_BASE="https://ftp.gnu.org/gnu/guix"
+
+pentesting_iso_setup ()
+{
+	case "$1" in
+		fedora-security-44)
+			dracut_live_iso_setup \
+				"Fedora Security Lab 44" \
+				"https://download.fedoraproject.org/pub/alt/releases/44/Labs/x86_64/iso/Fedora-Security-Live-44-1.7.x86_64.iso" \
+				"quiet" || return
+			;;
+		*)
+			nb_error "Unknown pentesting/security live ISO entry: $1"
+			return 1
+			;;
+	esac
+}
 
 artix_iso_file ()
 {
@@ -6500,6 +6528,7 @@ EASYOS_INITRD_PATH=
 EASYOS_WKG_IMAGE_PATH=
 EASYOS_WKG_UUID=
 EASYOS_WKG_DIR=
+EASYOS_WKG_LABEL=
 LIBREELEC_IMG_URL=
 LIBREELEC_LABEL=
 LIBREELEC_INIT_URL=
@@ -6543,16 +6572,12 @@ devuan "Devuan GNU/Linux" \
 debianlive "Debian-based live installers" \
 antixmx "antiX / MX Linux live installers" \
 communitylive "Community live installers" \
+pentesting "Pentesting and security live systems" \
 q4os "Q4OS Trinity 6.6" \
 fedora "Fedora" \
 opensuse "openSUSE" \
 mageia "Mageia" \
-rhel-type-10 "AlmaLinux 10 / CentOS 10-Stream / Rocky Linux 10" \
-rhel-type-9 "AlmaLinux 9 / CentOS 9-Stream / Rocky Linux 9" \
-rhel-type-8 "AlmaLinux 8 / Rocky Linux 8" \
-cloudlinux "CloudLinux 8 / CloudLinux 9" \
-rhel-extra "RHEL-compatible extras" \
-openeuler "openEuler" \
+rhel "RHEL-compatible installers" \
 arch "Arch Linux" \
 artix "Artix Linux" \
 void "Void Linux" \
@@ -6562,6 +6587,17 @@ slackware "Slackware" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
+if [ "$DISTRO" = "rhel" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a RHEL-compatible installer family:" 18 78 8 \
+	rhel-type-10 "AlmaLinux 10 / CentOS 10-Stream / Rocky Linux 10" \
+	rhel-type-9 "AlmaLinux 9 / CentOS 9-Stream / Rocky Linux 9" \
+	rhel-type-8 "AlmaLinux 8 / Rocky Linux 8" \
+	cloudlinux "CloudLinux 8 / CloudLinux 9" \
+	openeuler "openEuler" \
+	rhel-extra "Other RHEL-compatible installers" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	DISTRO=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+fi
 if [ $DISTRO = "ubuntu" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	resolute "Ubuntu 26.04 LTS (Subiquity)" \
@@ -6844,7 +6880,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
 	daphile-2505 "Daphile 25.05 x86_64 (music server)" \
 	ditana-09-beta "Ditana GNU/Linux 0.9 Beta" \
-	easyos-excalibur "EasyOS Excalibur 7.3.3" \
+	easyos-excalibur "EasyOS Excalibur 7.3.8" \
 	fatdog64-903 "Fatdog64 903" \
 	gobolinux-01701 "GoboLinux 017.01" \
 	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
@@ -6866,12 +6902,21 @@ if [ "$DISTRO" = "communitylive" ];then
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	puppy-trixiepup64-legacy-114 "TrixiePup64 Legacy 11.4" \
 	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
+	slackel-openbox-80 "Slackel 8.0 Openbox" \
 	sdesk-quartz-202510 "SDesk Quartz 2025.10" \
 	solus-xfce "Solus Xfce 2026-04-18" \
 	venom-base-sysv-20260320 "Venom Linux Base SysV 2026-03-20" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
 	community_live_iso_setup "$VERSION" || return
+fi
+
+if [ "$DISTRO" = "pentesting" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a pentesting/security live system to boot:" 12 78 4 \
+	fedora-security-44 "Fedora Security Lab 44" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	pentesting_iso_setup "$VERSION" || return
 fi
 
 if [ $DISTRO = "q4os" ];then

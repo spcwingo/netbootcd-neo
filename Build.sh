@@ -171,7 +171,9 @@ done
 if [ $NO = 1 ]; then exit 1; fi
 
 if [ "$(whoami)" != "root" ]; then
-    echo "Please run as root."
+    echo "Please run as root or through fakeroot:"
+    echo "  sudo ./Build.sh"
+    echo "  fakeroot ./Build.sh"
     exit 1
 fi
 
@@ -232,9 +234,9 @@ chmod +x "${NBINIT}/usr/bin/netboot"
 # Patch tc-config (disable swap in NetbootCD-Neo)
 cd "${NBINIT}/etc/init.d"
 patch -p0 < "${FDIR}/tc-config.diff" || {
-    echo "WARNING: tc-config.diff did not apply cleanly."
+    echo "ERROR: tc-config.diff did not apply cleanly."
     echo "The swap-disable patch may need updating for TinyCore x86_64."
-    echo "Continuing anyway - swap will not be disabled."
+    exit 1
 }
 cd -
 
