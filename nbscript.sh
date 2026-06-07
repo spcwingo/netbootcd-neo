@@ -671,6 +671,16 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/peppermintos/isos/XFCE/PeppermintOS-Debian-64.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=peppermint"
 			;;
+		pureos-11-gnome)
+			DEBIAN_LIVE_LABEL="PureOS 11 GNOME"
+			DEBIAN_LIVE_ISO_URL="https://storage.puri.sm/pureos/images/crimson/2026.05/gnome/pureos-11-gnome-live-20260515_amd64.iso"
+			DEBIAN_LIVE_MODE=casper-embed
+			DEBIAN_LIVE_KERNEL_PATHS="casper/vmlinuz casper/vmlinuz.efi"
+			DEBIAN_LIVE_INITRD_PATHS="casper/initrd.img casper/initrd casper/initrd.gz casper/initrd.lz casper/initrd.zst casper/initrd.zstd"
+			DEBIAN_LIVE_ROOTFS_PATHS="casper/filesystem.squashfs"
+			DEBIAN_LIVE_EMBED_ROOTFS_PATH="casper/filesystem.squashfs"
+			DEBIAN_LIVE_OPTIONS="quiet splash username=pureos hostname=pureos"
+			;;
 		refracta-xfce)
 			DEBIAN_LIVE_LABEL="Refracta 13.3 Xfce"
 			DEBIAN_LIVE_ISO_URL="https://get.refracta.org/files/stable/refracta_13.3_xfce_amd64-20260501_1208.iso"
@@ -745,8 +755,12 @@ debian_live_iso_setup ()
 
 	if [ "$DEBIAN_LIVE_MODE" = "embed" ]; then
 		echo -n "boot=live config components live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+	elif [ "$DEBIAN_LIVE_MODE" = "casper-embed" ]; then
+		echo -n "boot=casper live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	elif [ "$DEBIAN_LIVE_MODE" = "minios-embed" ]; then
 		echo -n "boot=live $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+	elif [ "$DEBIAN_LIVE_MODE" = "casper-url" ]; then
+		echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	else
 		echo -n "ip=dhcp boot=live config components fetch=$DEBIAN_LIVE_BOOT_URL ramdisk-size=85% noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	fi
@@ -1158,7 +1172,7 @@ debian_live_prepare_from_iso ()
 		return 0
 	fi
 	case "$DEBIAN_LIVE_MODE" in
-		embed) ;;
+		embed|casper-embed) ;;
 		*)
 		rm -f "$_debian_live_iso" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
 		[ -n "$_debian_live_mounted" ] && umount "$_debian_live_mount_dir" 2>/dev/null || true
@@ -6844,6 +6858,7 @@ if [ $DISTRO = "debianlive" ];then
 	nakedeb-16 "nakeDeb 1.6" \
 	neptune-91 "Neptune 9.1" \
 	peppermint-trixie "Peppermint OS Debian 64" \
+	pureos-11-gnome "PureOS 11 GNOME" \
 	refracta-xfce "Refracta 13.3 Xfce" \
 	refracta-nox "Refracta 13.3 noX" \
 	solydx-13 "SolydX 13" \
