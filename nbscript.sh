@@ -232,6 +232,48 @@ daphile_iso_setup ()
 	echo -n "daphile=$DAPHILE_VERSION_DIR vga=788 splash quiet panic=1 console=tty2 vt.global_cursor_default=0 i915.enable_fbc=0 threadirqs live " >>/tmp/nb-options
 }
 
+berry_iso_setup ()
+{
+	BERRY_LABEL="Berry Linux 1.42"
+	BERRY_ISO_URL="http://master.dl.sourceforge.net/project/berryos/Berry%20Linux/1.42/berry-1.42.iso?viasf=1"
+	BERRY_KERNEL_PATH="Setup/vmlinuz"
+	BERRY_INITRD_PATH="Setup/initrd.gz"
+	BERRY_ROOTFS_PATH="BERRY/BERRY"
+	echo -n "quiet console=tty2 audit=0 rootwait ro noresume noswap boot=cdrom berry_dir=/BERRY/BERRY overlay=ram lang=us autologin clocksource=tsc nopti noibrs noibpb nospectre_v2 nospec_store_bypass_disable " >>/tmp/nb-options
+}
+
+berry_extract_boot_file ()
+{
+	_berry_iso="$1"
+	_berry_out="$2"
+	_berry_desc="$3"
+	_berry_path="$4"
+	_berry_extract_dir="${_berry_out%/*}/nb-berry-extract"
+
+	rm -rf "$_berry_extract_dir"
+	mkdir -p "$_berry_extract_dir"
+	if ! "$BERRY_7Z" e -y -o"$_berry_extract_dir" "$_berry_iso" "$_berry_path" >/tmp/nb-berry-7z.log 2>&1; then
+		nb_error "Could not extract $_berry_desc from the $BERRY_LABEL ISO.\nSee /tmp/nb-berry-7z.log for details."
+		rm -rf "$_berry_extract_dir"
+		return 1
+	fi
+	_berry_found=
+	for _berry_candidate in "$_berry_extract_dir"/*; do
+		[ -f "$_berry_candidate" ] || continue
+		[ -s "$_berry_candidate" ] || continue
+		_berry_found="$_berry_candidate"
+		break
+	done
+	if [ -z "$_berry_found" ]; then
+		nb_error "Could not extract $_berry_desc from the $BERRY_LABEL ISO.\nSee /tmp/nb-berry-7z.log for details."
+		rm -rf "$_berry_extract_dir"
+		return 1
+	fi
+	mv "$_berry_found" "$_berry_out"
+	rm -rf "$_berry_extract_dir"
+	return 0
+}
+
 community_live_iso_setup ()
 {
 	_community_live_tag="$1"
@@ -250,7 +292,7 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
-		bredos-20251027)
+bredos-20251027)
 			archiso_live_iso_setup \
 				"BredOS 2025.10.27" \
 				"https://github.com/BredOS/BredOS-iso/releases/download/2025-10-27/BredOS-2025.10.27-x86_64.iso" \
@@ -259,6 +301,9 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sfs" \
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G nvme_load=yes i915.modeset=1 radeon.modeset=1 nouveau.modeset=1 nvidia-drm.modeset=0 module_blacklist=pcspkr,nvidia,nvidia_uvm,nvidia_drm,nvidia_modeset" || return
+			;;
+		berry-142)
+			berry_iso_setup || return
 			;;
 		ditana-09-beta)
 			archiso_live_iso_setup \
@@ -1209,6 +1254,212 @@ debian_live_prepare_from_iso ()
 	fi
 
 	rm -f "$_debian_live_iso" "$_debian_live_rootfs" /tmp/nb-debian-live-7z.log /tmp/nb-debian-live-mount.log
+	return 0
+}
+
+berry_repack_initrd_with_rootfs ()
+{
+	_berry_rootfs="$1"
+	_berry_parent="${_berry_rootfs%/*}"
+	_berry_work="$_berry_parent/initrd-work"
+	_berry_repacked="$_berry_parent/nb-initrd.repacked"
+	_berry_new="$_berry_parent/nb-initrd.new"
+	_berry_final="$_berry_parent/nb-initrd"
+
+	if ! _berry_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $BERRY_LABEL initramfs compression format."
+		return 1
+	fi
+	_berry_format="${_berry_main_info%% *}"
+	_berry_main_offset="${_berry_main_info#* }"
+
+	if [ "$_berry_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$BERRY_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_berry_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$BERRY_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_berry_work" "$_berry_repacked" "$_berry_new" "$_berry_final"
+	mkdir -p "$_berry_work"
+	_berry_unpack_failed=
+
+	case "$_berry_format" in
+		gzip)
+			if ! ( tail -c +"$(( _berry_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_berry_work" && cpio -idmu ) ) 2>/tmp/nb-berry-cpio.log; then
+				_berry_unpack_failed=1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _berry_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_berry_work" && cpio -idmu ) ) 2>/tmp/nb-berry-cpio.log; then
+				_berry_unpack_failed=1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _berry_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_berry_work" && cpio -idmu ) ) 2>/tmp/nb-berry-cpio.log; then
+				_berry_unpack_failed=1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _berry_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_berry_work" && cpio -idmu ) ) 2>/tmp/nb-berry-cpio.log; then
+				_berry_unpack_failed=1
+			fi
+			;;
+	esac
+
+	if [ -n "$_berry_unpack_failed" ] && [ ! -s "$_berry_work/init" ]; then
+		nb_error "Could not unpack the $BERRY_LABEL $_berry_format initramfs.\nSee /tmp/nb-berry-cpio.log for details."
+		rm -rf "$_berry_work"
+		return 1
+	fi
+	if [ ! -s "$_berry_work/init" ]; then
+		nb_error "Could not find the $BERRY_LABEL init script."
+		rm -rf "$_berry_work"
+		return 1
+	fi
+
+	mkdir -p "$_berry_work/BERRY"
+	if ! mv "$_berry_rootfs" "$_berry_work/BERRY/BERRY"; then
+		nb_error "Could not embed the $BERRY_LABEL live filesystem."
+		rm -rf "$_berry_work"
+		return 1
+	fi
+
+	if ! awk '
+		$0 == "case \"$CMDLINE\" in *\\ memboot*) memboot=y; ;; esac" {
+			print
+			print ""
+			print "if [ -r ${looproot} ]; then"
+			print "\t[ -e /dev/loop0 ] || mknod /dev/loop0 b 7 0 2>/dev/null || true"
+			print "\tlosetup /dev/loop0 ${looproot} >/dev/null 2>&1 || failed"
+			print "\tfs=squashfs"
+			print "\tmount -t squashfs -o ro /dev/loop0 ${sysdir} >/dev/null 2>&1 || (fs=ext2; pmount /dev/loop0 ${sysdir} \"-o ro\") || failed"
+			print "\tFOUND_BERRY=netbootcd"
+			print "\trinit ${sysdir} ${sysdir}/initrd"
+			print "fi"
+			found=1
+			next
+		}
+		{ print }
+		END { if (!found) exit 1 }
+	' "$_berry_work/init" >"$_berry_work/init.new"; then
+		nb_error "Could not patch the $BERRY_LABEL init script."
+		rm -rf "$_berry_work"
+		return 1
+	fi
+	mv "$_berry_work/init.new" "$_berry_work/init"
+	chmod 755 "$_berry_work/init"
+
+	case "$_berry_format" in
+		gzip)
+			if ! ( cd "$_berry_work" && find . | cpio -o -H newc | gzip -1 -c >"$_berry_repacked" ); then
+				nb_error "Could not repack the $BERRY_LABEL gzip initramfs."
+				rm -rf "$_berry_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_berry_work" && find . | cpio -o -H newc | zstd -q -c >"$_berry_repacked" ); then
+				nb_error "Could not repack the $BERRY_LABEL zstd initramfs."
+				rm -rf "$_berry_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_berry_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_berry_repacked" ); then
+				nb_error "Could not repack the $BERRY_LABEL xz initramfs."
+				rm -rf "$_berry_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_berry_work" && find . | cpio -o -H newc >"$_berry_repacked" ); then
+				nb_error "Could not repack the $BERRY_LABEL cpio initramfs."
+				rm -rf "$_berry_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >"$_berry_new"
+	if [ "$_berry_main_offset" -gt 0 ]; then
+		if ! head -c "$_berry_main_offset" /tmp/nb-initrd >>"$_berry_new"; then
+			nb_error "Could not preserve the $BERRY_LABEL early initramfs prefix."
+			rm -rf "$_berry_work" "$_berry_repacked" "$_berry_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_berry_repacked" >>"$_berry_new"; then
+		nb_error "Could not write the repacked $BERRY_LABEL initramfs."
+		rm -rf "$_berry_work" "$_berry_repacked" "$_berry_new"
+		return 1
+	fi
+	mv "$_berry_new" "$_berry_final"
+	rm -rf "$_berry_work" "$_berry_repacked"
+	rm -f /tmp/nb-initrd
+	ln -s "$_berry_final" /tmp/nb-initrd
+	return 0
+}
+
+berry_prepare_from_iso ()
+{
+	_berry_work="/tmp/nb-berry-work"
+	_berry_iso="$_berry_work/nb-berry.iso"
+	_berry_rootfs="$_berry_work/berry.squashfs"
+
+	if ! BERRY_7Z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $BERRY_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_berry_work " /proc/mounts 2>/dev/null; then
+		umount "$_berry_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_berry_work"
+	mkdir -p "$_berry_work"
+	_berry_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_berry_work" 2>/tmp/nb-berry-mount.log; then
+		_berry_mounted=1
+	fi
+
+	if ! wgetgauge "$BERRY_ISO_URL" "$_berry_iso" "Downloading $BERRY_LABEL ISO"; then
+		nb_error "Could not download $BERRY_LABEL ISO from:\n\n$BERRY_ISO_URL\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_berry_mounted" ] && umount "$_berry_work" 2>/dev/null || true
+		rm -rf "$_berry_work"
+		return 1
+	fi
+	if ! berry_extract_boot_file "$_berry_iso" /tmp/nb-linux "kernel" "$BERRY_KERNEL_PATH"; then
+		[ -n "$_berry_mounted" ] && umount "$_berry_work" 2>/dev/null || true
+		rm -rf "$_berry_work"
+		return 1
+	fi
+	if ! berry_extract_boot_file "$_berry_iso" /tmp/nb-initrd "initrd" "$BERRY_INITRD_PATH"; then
+		[ -n "$_berry_mounted" ] && umount "$_berry_work" 2>/dev/null || true
+		rm -rf "$_berry_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	if ! berry_extract_boot_file "$_berry_iso" "$_berry_rootfs" "live filesystem" "$BERRY_ROOTFS_PATH"; then
+		[ -n "$_berry_mounted" ] && umount "$_berry_work" 2>/dev/null || true
+		rm -rf "$_berry_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+	rm -f "$_berry_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $BERRY_LABEL live filesystem into the initrd.\n\nThis can take a while." 7 70 || true
+	if ! berry_repack_initrd_with_rootfs "$_berry_rootfs"; then
+		[ -n "$_berry_mounted" ] && umount "$_berry_work" 2>/dev/null || true
+		rm -rf "$_berry_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-berry-7z.log /tmp/nb-berry-cpio.log /tmp/nb-berry-mount.log
 	return 0
 }
 
@@ -6526,6 +6777,11 @@ DAPHILE_KERNEL_PATH=
 DAPHILE_INITRD_PATH=
 DAPHILE_ROOTFS_PATH=
 DAPHILE_VERSION_DIR=
+BERRY_ISO_URL=
+BERRY_LABEL=
+BERRY_KERNEL_PATH=
+BERRY_INITRD_PATH=
+BERRY_ROOTFS_PATH=
 VENOM_ISO_URL=
 VENOM_LABEL=
 VENOM_KERNEL_PATH=
@@ -6890,6 +7146,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	acreetionos-cinnamon-10 "AcreetionOS 1.0 Cinnamon" \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
 	bredos-20251027 "BredOS 2025.10.27" \
+	berry-142 "Berry Linux 1.42" \
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
@@ -7360,6 +7617,11 @@ elif [ -n "${SALIX_ISO_URL:-}" ]; then
 elif [ -n "${DAPHILE_ISO_URL:-}" ]; then
 	if ! daphile_prepare_from_iso "$DAPHILE_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-daphile.iso
+		return 1
+	fi
+elif [ -n "${BERRY_ISO_URL:-}" ]; then
+	if ! berry_prepare_from_iso; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-berry.iso
 		return 1
 	fi
 elif [ -n "${VENOM_ISO_URL:-}" ]; then
