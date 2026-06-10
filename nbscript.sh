@@ -292,7 +292,7 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
-bredos-20251027)
+		bredos-20251027)
 			archiso_live_iso_setup \
 				"BredOS 2025.10.27" \
 				"https://github.com/BredOS/BredOS-iso/releases/download/2025-10-27/BredOS-2025.10.27-x86_64.iso" \
@@ -7222,7 +7222,7 @@ if [ "$DISTRO" = "rhel" ];then
 	DISTRO=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
 fi
-if [ $DISTRO = "ubuntu" ];then
+if [ "$DISTRO" = "ubuntu" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	resolute "Ubuntu 26.04 LTS (Subiquity)" \
 	questing "Ubuntu 25.10 (Subiquity)" \
@@ -7272,7 +7272,7 @@ if [ $DISTRO = "ubuntu" ];then
 		fi
 	fi
 fi
-if [ $DISTRO = "ubuntuflavor" ];then
+if [ "$DISTRO" = "ubuntuflavor" ];then
 	UBUNTU_LIVE_CUSTOM=
 	dialog --backtitle "$TITLE" --menu "Choose an Ubuntu flavor or derivative to boot:" 24 78 19 \
 	kubuntu-26.04 "Kubuntu 26.04 LTS" \
@@ -7421,7 +7421,7 @@ if [ $DISTRO = "ubuntuflavor" ];then
 			"Ubuntu live ISO" || return
 	fi
 fi
-if [ $DISTRO = "debian" ];then
+if [ "$DISTRO" = "debian" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	trixie "Debian 13" \
 	bookworm "Debian 12" \
@@ -7434,7 +7434,7 @@ if [ $DISTRO = "debian" ];then
 	INITRDURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
 fi
-if [ $DISTRO = "devuan" ];then
+if [ "$DISTRO" = "devuan" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
  	excalibur "Devuan excalibur" \
 	daedalus "Devuan daedalus" \
@@ -7447,7 +7447,7 @@ if [ $DISTRO = "devuan" ];then
 	echo -n 'vga=normal quiet '>>/tmp/nb-options
 fi
 
-if [ $DISTRO = "debianlive" ];then
+if [ "$DISTRO" = "debianlive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a Debian-based live installer to boot:" 24 78 22 \
 	besgnulinux-jwm "Besgnulinux JWM 3.3" \
 	butterbian-xfce "Butterbian Xfce 0.2.1" \
@@ -7484,7 +7484,7 @@ if [ $DISTRO = "debianlive" ];then
 	debian_live_iso_setup "$VERSION" || return
 fi
 
-if [ $DISTRO = "antixmx" ];then
+if [ "$DISTRO" = "antixmx" ];then
 	dialog --backtitle "$TITLE" --menu "Choose an antiX/MX live installer to boot:" 18 75 8 \
 	antix-26-core "antiX 26 Core" \
 	avlinux-mxe-251 "AV Linux MXE 25.1" \
@@ -7548,13 +7548,13 @@ if [ "$DISTRO" = "pentesting" ];then
 	pentesting_iso_setup "$VERSION" || return
 fi
 
-if [ $DISTRO = "q4os" ];then
+if [ "$DISTRO" = "q4os" ];then
 	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6.6-5d30850e"
 	KERNELURL="$BASE/vmlinuz"
 	INITRDURL="$BASE/initrd"
 	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
 fi
-if [ $DISTRO = "fedora" ];then
+if [ "$DISTRO" = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	releases/44/Server "Fedora Server 44" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
@@ -7566,14 +7566,14 @@ if [ $DISTRO = "fedora" ];then
 	echo -n "inst.stage2=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "opensuse" ];then
+if [ "$DISTRO" = "opensuse" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	tumbleweed "openSUSE Tumbleweed" \
 	slowroll "openSUSE Slowroll" \
 	leap/16.0 "openSUSE Leap 16.0" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	if [ $VERSION != "tumbleweed" ] && [ $VERSION != "slowroll" ];then
+	if [ "$VERSION" != "tumbleweed" ] && [ "$VERSION" != "slowroll" ];then
 		VERSION=distribution/$VERSION
 	fi
 	KERNELURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/linux"
@@ -7583,7 +7583,7 @@ if [ $DISTRO = "opensuse" ];then
 	echo -n "install=$(cat /tmp/nb-server)" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "mageia" ];then
+if [ "$DISTRO" = "mageia" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	10 "Mageia 10 pre-release" \
 	9 "Mageia 9" \
@@ -7594,7 +7594,7 @@ if [ $DISTRO = "mageia" ];then
 	INITRDURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/all.rdz"
 	echo -n 'automatic=method:http' >>/tmp/nb-options
 fi
-if [ $DISTRO = "rhel-type-10" ];then
+if [ "$DISTRO" = "rhel-type-10" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	a_10 "Latest version of AlmaLinux 10" \
 	c_10-stream "Latest version of CentOS Stream 10" \
@@ -7603,11 +7603,11 @@ if [ $DISTRO = "rhel-type-10" ];then
 	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	if [ $TYPE = a ];then
+	if [ "$TYPE" = a ];then
 		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	elif [ $TYPE = c ];then
+	elif [ "$TYPE" = c ];then
 		dialog --inputbox "Where do you want to install CentOS Stream from?" 8 70 "https://ftp-chi.osuosl.org/pub/centos-stream/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	elif [ $TYPE = r ];then
+	elif [ "$TYPE" = r ];then
 		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
 		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
@@ -7618,7 +7618,7 @@ if [ $DISTRO = "rhel-type-10" ];then
 	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "rhel-type-9" ];then
+if [ "$DISTRO" = "rhel-type-9" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	a_9 "Latest version of AlmaLinux 9" \
 	c_9-stream "Latest version of CentOS Stream 9" \
@@ -7627,11 +7627,11 @@ if [ $DISTRO = "rhel-type-9" ];then
 	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	if [ $TYPE = a ];then
+	if [ "$TYPE" = a ];then
 		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	elif [ $TYPE = c ];then
+	elif [ "$TYPE" = c ];then
 		dialog --inputbox "Where do you want to install CentOS Stream from?" 8 70 "https://ftp-chi.osuosl.org/pub/centos-stream/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	elif [ $TYPE = r ];then
+	elif [ "$TYPE" = r ];then
 		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
 		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
@@ -7642,7 +7642,7 @@ if [ $DISTRO = "rhel-type-9" ];then
 	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "rhel-type-8" ];then
+if [ "$DISTRO" = "rhel-type-8" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	a_8 "Latest version of AlmaLinux 8" \
 	r_8 "Latest version of Rocky Linux 8" \
@@ -7650,9 +7650,9 @@ if [ $DISTRO = "rhel-type-8" ];then
 	getversion || return 0
 	TYPE=$(echo $VERSION|head -c 1)
 	VERSION=$(echo $VERSION|tail -c +3)
-	if [ $TYPE = a ];then
+	if [ "$TYPE" = a ];then
 		dialog --inputbox "Where do you want to install AlmaLinux OS from?" 8 70 "http://repo.almalinux.org/almalinux/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	elif [ $TYPE = r ];then
+	elif [ "$TYPE" = r ];then
 		dialog --inputbox "Where do you want to install Rocky Linux from?" 8 70 "http://download.rockylinux.org/pub/rocky/$VERSION/BaseOS/x86_64/os" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
 	else
 		dialog --inputbox "Where do you want to install this distribution from?" 8 70 "" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
@@ -7663,7 +7663,7 @@ if [ $DISTRO = "rhel-type-8" ];then
 	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "cloudlinux" ];then
+if [ "$DISTRO" = "cloudlinux" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	9 "CloudLinux 9" \
 	8 "CloudLinux 8" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
@@ -7675,7 +7675,7 @@ if [ $DISTRO = "cloudlinux" ];then
 	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "rhel-extra" ];then
+if [ "$DISTRO" = "rhel-extra" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	opencloudos-9 "OpenCloudOS 9 latest" \
 	opencloudos-9.4 "OpenCloudOS 9.4" \
@@ -7747,7 +7747,7 @@ if [ $DISTRO = "rhel-extra" ];then
 	fi
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "openeuler" ];then
+if [ "$DISTRO" = "openeuler" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	24.03-LTS-SP3 "openEuler 24.03 LTS SP3" \
 	24.03-LTS-SP1 "openEuler 24.03 LTS SP1" \
@@ -7762,7 +7762,7 @@ if [ $DISTRO = "openeuler" ];then
 	echo -n "inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
-if [ $DISTRO = "arch" ];then
+if [ "$DISTRO" = "arch" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	latest "Arch x86_64" \
 	archboot-latest "Archboot latest installer" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
@@ -7778,7 +7778,7 @@ if [ $DISTRO = "arch" ];then
 		echo -n 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
 	fi
 fi
-if [ $DISTRO = "artix" ];then
+if [ "$DISTRO" = "artix" ];then
 	dialog --backtitle "$TITLE" --menu "Choose an Artix system to boot:" 12 70 4 \
 	base-dinit "Base dinit" \
 	base-openrc "Base OpenRC" \
@@ -7788,7 +7788,7 @@ if [ $DISTRO = "artix" ];then
 	rm /tmp/nb-version
 	artix_iso_setup "$VERSION" || return
 fi
-if [ $DISTRO = "void" ];then
+if [ "$DISTRO" = "void" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a Void Linux live system to boot:" 14 76 6 \
 	glibc-base "Base (glibc)" \
 	glibc-xfce "Xfce (glibc)" \
@@ -7798,7 +7798,7 @@ if [ $DISTRO = "void" ];then
 	rm /tmp/nb-version
 	void_iso_setup "$VERSION" || return
 fi
-if [ $DISTRO = "altlinux" ];then
+if [ "$DISTRO" = "altlinux" ];then
 	dialog --backtitle "$TITLE" --menu "Choose an ALT Linux system to boot:" 10 76 2 \
 	regular-jeos-systemd "Sisyphus regular JeOS systemd installer (latest)" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
@@ -7822,7 +7822,7 @@ if [ "$DISTRO" = "guix" ];then
 
 	guix_iso_setup "$VERSION" || return
 fi
-if [ $DISTRO = "slackware" ];then
+if [ "$DISTRO" = "slackware" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	slackware64-current "Slackware64-current" \
 	slackware64-15.0 "Slackware 15.0" \
@@ -7839,7 +7839,7 @@ if [ $DISTRO = "slackware" ];then
 		echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
 	fi
 fi
-if [ $DISTRO = "rescue" ];then
+if [ "$DISTRO" = "rescue" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
 	gparted           "GParted Live 1.8.1-3" \
 	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
@@ -7849,40 +7849,40 @@ if [ $DISTRO = "rescue" ];then
 	grml-small        "Grml Small 2026.04" 2>/tmp/nb-rescue || { rm -f /tmp/nb-rescue; return; }
 	DISTRO=$(cat /tmp/nb-rescue)
 	rm /tmp/nb-rescue
-	if [ $DISTRO = "gparted" ];then
+	if [ "$DISTRO" = "gparted" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/1.8.1-3-5616e296"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "boot=live fetch=$SQUASH union=overlay username=user vga=788" >>/tmp/nb-options
 	fi
-	if [ $DISTRO = "clonezilla-deb" ];then
+	if [ "$DISTRO" = "clonezilla-deb" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.1-35-1a41a72c"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "boot=live username=user union=overlay config components noswap edd=on nomodeset ocs_live_run=ocs-live-general ocs_live_batch=no net.ifnames=0 nosplash noprompt fetch=$SQUASH" >>/tmp/nb-options
 	fi
-	if [ $DISTRO = "rescuezilla" ];then
+	if [ "$DISTRO" = "rescuezilla" ];then
 		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/2.6.1-123ed276"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
 	fi
-	if [ $DISTRO = "4mlinux" ];then
+	if [ "$DISTRO" = "4mlinux" ];then
 		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/51.0-fcaac630"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 	fi
-	if [ $DISTRO = "grml-full" ];then
+	if [ "$DISTRO" = "grml-full" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.04-23b18cd7"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
 	fi
-	if [ $DISTRO = "grml-small" ];then
+	if [ "$DISTRO" = "grml-small" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.04-410a8803"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
@@ -8094,10 +8094,10 @@ else
 	ARGS="-l /tmp/nb-linux $OPTIONS $CUSTOM"
 fi
 
-if [ $DISTRO = "rhel-type-5" ];then
+if [ "$DISTRO" = "rhel-type-5" ];then
 	ARGS=$ARGS" --args-linux"
 fi
-if [ $EFIMODE = 1 ]; then
+if [ "$EFIMODE" = 1 ]; then
 	case "$DISTRO" in
 		fedora64|rhel-type-*-64)
 			echo -n ' inst.efi' >>/tmp/nb-options
@@ -8117,7 +8117,7 @@ Loading kernel and booting new system..." 15 80 || true
 	# classic kexec_load syscall if -s is not compiled in (e.g. 32-bit kernel).
 	rm -f /tmp/nb-kexec.log
 	_krc=0
-	if [ $EFIMODE = 1 ] && kexec --help 2>&1 | grep -q -- '-s'; then
+	if [ "$EFIMODE" = 1 ] && kexec --help 2>&1 | grep -q -- '-s'; then
 		kexec -s $ARGS --command-line="$CMDLINE" >>/tmp/nb-kexec.log 2>&1 || \
 			kexec $ARGS --command-line="$CMDLINE" >>/tmp/nb-kexec.log 2>&1 || \
 			_krc=$?

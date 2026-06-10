@@ -163,12 +163,12 @@ for i in nbscript.sh tc-config.diff; do
 done
 for i in mkfs.vfat unsquashfs grub-mkstandalone mcopy \
           xorriso gcc make; do
-    if ! which "$i" > /dev/null 2>&1; then
+    if ! command -v "$i" >/dev/null 2>&1; then
         echo "Please install $i!"
         NO=1
     fi
 done
-if [ $NO = 1 ]; then exit 1; fi
+if [ "$NO" = 1 ]; then exit 1; fi
 
 if [ "$(whoami)" != "root" ]; then
     echo "Please run as root or through fakeroot:"
@@ -211,13 +211,13 @@ if [ ! -f /tmp/internet-is-up ]; then
 		echo "Use the 'wifi' option in the menu to connect to a wireless network."
 	else
 		echo "Waiting for internet connection (will keep trying indefinitely)"
-		echo -n "Testing example.com"
+		printf '%s' "Testing example.com"
 		while ! wget --no-check-certificate --tries=1 -T 5 --spider \
 			http://www.example.com >/dev/null 2>&1; do
 			sleep 1
-			echo -n "."
+			printf '.'
 		done
-		echo ""
+		printf '\n'
 		echo > /tmp/internet-is-up
 	fi
 fi
@@ -274,7 +274,7 @@ strip "${NBINIT}/sbin/kexec"
 echo "Installed kexec-tools ${KEXEC_VER} (64-bit static, -s supported)"
 rm -rf "${KEXEC_BUILD}"
 
-echo "if ! which startx;then netboot;else sleep 5;echo '** Type netboot to start **';fi" \
+echo "if ! command -v startx >/dev/null 2>&1; then netboot; else sleep 5; echo '** Type netboot to start **'; fi" \
     >> "${NBINIT}/etc/skel/.profile"
 
 cd "${NBINIT}"
