@@ -28,7 +28,7 @@ PATH=/usr/local/sbin:/usr/local/bin:$PATH
 export PATH
 export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-TITLE="NetbootCD-Neo Script 17.1 - May 11, 2026"
+TITLE="NetbootCD-Neo Script 17.2 - June 10, 2026"
 
 EFIMODE=0
 [ -d /sys/firmware/efi ] && EFIMODE=1

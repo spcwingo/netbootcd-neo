@@ -1,5 +1,5 @@
 #!/bin/bash
-## Build.sh 17.1 for netbootcd-neo - BIOS + UEFI support (x86_64)
+## Build.sh 17.2 for netbootcd-neo - BIOS + UEFI support (x86_64)
 ## Copyright (C) 2022 Isaac Schemm <isaacschemm@gmail.com>
 ## Edited by Jonathan A. Wingo <spcwingo1@gmail.com> to support
 ## only x86_64 in either BIOS or UEFI mode.
@@ -40,8 +40,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-NBCDVER=17.1
-COREVER=17.1
+NBCDVER=17.2
+COREVER=17.2
 KEXEC_VER=2.0.32
 TCX64="http://distro.ibiblio.org/tinycorelinux/${COREVER%.*}.x/x86_64"
 BASE_TCZ_PKGS="dialog ncursesw openssl 7zip zstd libzstd xz liblzma liblz4 firmware-lan firmware-rtl_nic firmware-cavium_nic"
