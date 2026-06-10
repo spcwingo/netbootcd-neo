@@ -1,6 +1,6 @@
 NetbootCD-Neo is a Linux live environment based on Tiny Core Linux. The live enviroment allows the user to download and run one of several Linux netboot installers (live environments and utilities as well), which can install a full GNU/Linux system with only a hard drive and Internet connection.
 
-Some of the distributions supported by NetbootCD-Neo are prerelease or development distributions (such as Fedora Rawhide and Debian sid.) Because NetbootCD-Neo downloads the latest installer, which in turn downloads the latest system components, you can install a fully up-to-date system without burning a new CD or USB flash drive.
+Please keep in mind that some of the distributions supported by NetbootCD-Neo are prerelease or development distributions (such as Fedora Rawhide and Debian sid.)
 
 The original NetbootCD script that this is based upon is written by Isaac Schemm (et al) and is licensed GPLv2+. NetbootCD-Neo uses the same license. Other components have their own license terms.
 
