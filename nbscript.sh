@@ -100,8 +100,8 @@ dracut_live_iso_setup ()
 	DEBIAN_LIVE_ISO_URL="$2"
 	DEBIAN_LIVE_BOOT_URL="$2"
 	DEBIAN_LIVE_MODE=embed
-	DEBIAN_LIVE_KERNEL_PATHS="images/pxeboot/vmlinuz boot/x86_64/loader/linux isolinux/vmlinuz boot/kernel boot/vmlinuz boot/vmlinuz-*"
-	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img boot/x86_64/loader/initrd isolinux/initrd.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
+	DEBIAN_LIVE_KERNEL_PATHS="images/pxeboot/vmlinuz boot/x86_64/loader/linux isolinux/vmlinuz isolinux/vmlinuz0 boot/kernel boot/vmlinuz boot/vmlinuz-*"
+	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img boot/x86_64/loader/initrd isolinux/initrd.img isolinux/initrd0.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
@@ -315,6 +315,25 @@ bredos-20251027)
 				"ditana/x86_64/airootfs.sha512" \
 				"archisobasedir=ditana arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
+		endeavouros-titan-neo-20260427)
+			archiso_live_iso_setup \
+				"EndeavourOS Titan Neo 2026.04.27" \
+				"https://mirrors.gigenet.com/endeavouros/iso/EndeavourOS_Titan-Neo-2026.04.27.iso" \
+				"arch/boot/x86_64/vmlinuz-linux" \
+				"arch/boot/x86_64/initramfs-linux.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.sha512" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
+			;;
+		garuda-kde-lite-latest)
+			garuda_iso_setup \
+				"Garuda KDE Lite latest" \
+				"https://iso.builds.garudalinux.org/iso/latest/garuda/kde-lite/latest.iso" \
+				"boot/vmlinuz-x86_64" \
+				"boot/initramfs-x86_64.img" \
+				"garuda" \
+				"x86_64" || return
+			;;
 		fatdog64-903)
 			iso_boot_setup \
 				"https://distro.ibiblio.org/fatdog/iso/Fatdog64-903.iso" \
@@ -387,6 +406,16 @@ bredos-20251027)
 				"prismlinux/x86_64/airootfs.sfs" \
 				"prismlinux/x86_64/airootfs.sha512" \
 				"archisobasedir=prismlinux arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes nvidia-drm.modeset=1" || return
+			;;
+		rebornos-20260122)
+			archiso_live_iso_setup \
+				"RebornOS 2026.01.22" \
+				"https://cdn.soulharsh007.dev/RebornOS-ISO/rebornos_iso-2026.01.22-x86_64.iso" \
+				"arch/boot/x86_64/vmlinuz-linux" \
+				"arch/boot/x86_64/initramfs-linux.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.sha512" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
 		solus-xfce)
 			dracut_live_iso_setup \
@@ -2997,6 +3026,331 @@ archiso_prepare_from_iso ()
 	rm -f "$_archiso_iso" "$_archiso_rootfs" "$_archiso_checksum" /tmp/nb-archiso-7z.log /tmp/nb-archiso-mount.log
 	[ -n "$_archiso_mounted" ] && umount "$_archiso_work" 2>/dev/null || true
 	rm -rf "$_archiso_work"
+	return 0
+}
+
+garuda_iso_setup ()
+{
+	GARUDA_LABEL="$1"
+	GARUDA_ISO_URL="$2"
+	GARUDA_KERNEL_PATH="$3"
+	GARUDA_INITRD_PATH="$4"
+	GARUDA_BASEDIR="$5"
+	GARUDA_ARCH="$6"
+	echo -n "misobasedir=$GARUDA_BASEDIR root=miso:/dev/null checksum=n copytoram=n overlay_root_size=75% netbootcd_garuda=1 systemd.show_status=1 " >>/tmp/nb-options
+}
+
+garuda_patch_miso_scripts ()
+{
+	_garuda_initrd_work="$1"
+	_garuda_miso_script=
+	_garuda_parse_script=
+
+	for _garuda_candidate in $(find "$_garuda_initrd_work" -type f -name '*miso*.sh' 2>/dev/null); do
+		if [ -z "$_garuda_miso_script" ] && grep -q 'miso_mount_root' "$_garuda_candidate" 2>/dev/null; then
+			_garuda_miso_script="$_garuda_candidate"
+		fi
+		if [ -z "$_garuda_parse_script" ] && grep -q 'root#miso' "$_garuda_candidate" 2>/dev/null; then
+			_garuda_parse_script="$_garuda_candidate"
+		fi
+	done
+
+	if [ -z "$_garuda_miso_script" ]; then
+		nb_error "Could not find the $GARUDA_LABEL miso mount script in the initramfs."
+		return 1
+	fi
+
+	if ! awk '
+		/^miso_mount_root\(\)/ {
+			in_miso_mount_root = 1
+		}
+		in_miso_mount_root && /^[[:space:]]*if ! mountpoint -q "\/run\/miso\/bootmnt"; then/ && ! inserted {
+			print "    if [[ -f \"/${misobasedir}/${arch}/rootfs.sfs\" ]]; then"
+			print "        echo \":: Using NetbootCD embedded Garuda live media\""
+			print "        mkdir -p /run/miso/bootmnt"
+			print "        if [[ ! -d \"/run/miso/bootmnt/${misobasedir}/${arch}\" ]]; then"
+			print "            mkdir -p \"/run/miso/bootmnt/${misobasedir}\""
+			print "            mv \"/${misobasedir}/${arch}\" \"/run/miso/bootmnt/${misobasedir}/\" || die \"Failed to stage embedded Garuda live media\""
+			print "        fi"
+			print "    elif ! mountpoint -q \"/run/miso/bootmnt\"; then"
+			inserted = 1
+			next
+		}
+		{
+			print
+		}
+		END {
+			if (!inserted)
+				exit 1
+		}
+	' "$_garuda_miso_script" >"$_garuda_miso_script.new"; then
+		nb_error "Could not patch the $GARUDA_LABEL miso mount script."
+		rm -f "$_garuda_miso_script.new"
+		return 1
+	fi
+	mv "$_garuda_miso_script.new" "$_garuda_miso_script"
+	chmod 755 "$_garuda_miso_script"
+
+	if ! grep -q 'NetbootCD embedded Garuda root trigger' "$_garuda_miso_script" 2>/dev/null; then
+		if ! awk '
+			/^if \[ -n "\$root" -a -z "\$\{root%%miso:\*\}" \]; then$/ && ! inserted {
+				print "# NetbootCD embedded Garuda root trigger"
+				print "if [[ \"$(getarg netbootcd_garuda=)\" == \"1\" ]]; then"
+				print "    root=\"miso:/dev/null\""
+				print "    miso_mount_root"
+				print "elif [ -n \"$root\" -a -z \"${root%%miso:*}\" ]; then"
+				inserted = 1
+				next
+			}
+			{
+				print
+			}
+			END {
+				if (!inserted)
+					exit 1
+			}
+		' "$_garuda_miso_script" >"$_garuda_miso_script.new"; then
+			nb_error "Could not patch the $GARUDA_LABEL miso root trigger."
+			rm -f "$_garuda_miso_script.new"
+			return 1
+		fi
+		mv "$_garuda_miso_script.new" "$_garuda_miso_script"
+		chmod 755 "$_garuda_miso_script"
+	fi
+
+	if [ -n "$_garuda_parse_script" ] && ! grep -q 'netbootcd_garuda' "$_garuda_parse_script" 2>/dev/null; then
+		if ! awk '
+			NR == 1 {
+				print
+				next
+			}
+			NR == 2 && ! inserted {
+				print ""
+				print "if [ \"$(getarg netbootcd_garuda=)\" = \"1\" ]; then"
+				print "    root=\"miso:/dev/null\""
+				print "    rootok=1"
+				print "    return 0 2>/dev/null || exit 0"
+				print "fi"
+				print ""
+				inserted = 1
+			}
+			{
+				print
+			}
+			END {
+				if (!inserted)
+					exit 1
+			}
+		' "$_garuda_parse_script" >"$_garuda_parse_script.new"; then
+			nb_error "Could not patch the $GARUDA_LABEL miso command-line parser."
+			rm -f "$_garuda_parse_script.new"
+			return 1
+		fi
+		mv "$_garuda_parse_script.new" "$_garuda_parse_script"
+		chmod 755 "$_garuda_parse_script"
+	fi
+
+	return 0
+}
+
+garuda_repack_initrd_with_layers ()
+{
+	_garuda_layers="$1"
+	_garuda_work="/tmp/nb-garuda-initrd-work"
+	_garuda_repacked="/tmp/nb-initrd.garuda"
+
+	if ! _garuda_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $GARUDA_LABEL initramfs compression format."
+		return 1
+	fi
+	_garuda_format="${_garuda_main_info%% *}"
+	_garuda_main_offset="${_garuda_main_info#* }"
+
+	if [ "$_garuda_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$GARUDA_LABEL initramfs uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_garuda_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$GARUDA_LABEL initramfs uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_garuda_work" "$_garuda_repacked" /tmp/nb-initrd.new
+	mkdir -p "$_garuda_work"
+
+	case "$_garuda_format" in
+		gzip)
+			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_garuda_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GARUDA_LABEL gzip initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_garuda_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GARUDA_LABEL zstd initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_garuda_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GARUDA_LABEL xz initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_garuda_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $GARUDA_LABEL cpio initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$_garuda_work/$GARUDA_BASEDIR/$GARUDA_ARCH"
+	for _garuda_sfs in "$_garuda_layers"/*.sfs; do
+		[ -f "$_garuda_sfs" ] || continue
+		mv "$_garuda_sfs" "$_garuda_work/$GARUDA_BASEDIR/$GARUDA_ARCH/${_garuda_sfs##*/}" || {
+			nb_error "Could not embed the $GARUDA_LABEL live layer ${_garuda_sfs##*/}."
+			rm -rf "$_garuda_work"
+			return 1
+		}
+	done
+
+	if ! garuda_patch_miso_scripts "$_garuda_work"; then
+		rm -rf "$_garuda_work" "$_garuda_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+
+	case "$_garuda_format" in
+		gzip)
+			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc | gzip -1 -c >"$_garuda_repacked" ); then
+				nb_error "Could not repack the $GARUDA_LABEL gzip initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc | zstd -q -c >"$_garuda_repacked" ); then
+				nb_error "Could not repack the $GARUDA_LABEL zstd initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_garuda_repacked" ); then
+				nb_error "Could not repack the $GARUDA_LABEL xz initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc >"$_garuda_repacked" ); then
+				nb_error "Could not repack the $GARUDA_LABEL cpio initramfs."
+				rm -rf "$_garuda_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >/tmp/nb-initrd.new
+	if [ "$_garuda_main_offset" -gt 0 ]; then
+		if ! head -c "$_garuda_main_offset" /tmp/nb-initrd >>/tmp/nb-initrd.new; then
+			nb_error "Could not preserve the $GARUDA_LABEL early initramfs prefix."
+			rm -rf "$_garuda_work" "$_garuda_repacked" /tmp/nb-initrd.new
+			return 1
+		fi
+	fi
+	if ! cat "$_garuda_repacked" >>/tmp/nb-initrd.new; then
+		nb_error "Could not write the repacked $GARUDA_LABEL initramfs."
+		rm -rf "$_garuda_work" "$_garuda_repacked" /tmp/nb-initrd.new
+		return 1
+	fi
+	mv /tmp/nb-initrd.new /tmp/nb-initrd
+	rm -rf "$_garuda_work" "$_garuda_repacked"
+	return 0
+}
+
+garuda_prepare_from_iso ()
+{
+	_garuda_iso_url="$1"
+	_garuda_work="/tmp/nb-garuda-work"
+	_garuda_iso="$_garuda_work/nb-garuda.iso"
+	_garuda_boot="$_garuda_work/boot"
+	_garuda_layers="$_garuda_work/layers"
+
+	if ! _garuda_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $GARUDA_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_garuda_work " /proc/mounts 2>/dev/null; then
+		umount "$_garuda_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_garuda_work" /tmp/nb-garuda-initrd-work /tmp/nb-initrd.garuda /tmp/nb-initrd.new
+	mkdir -p "$_garuda_boot" "$_garuda_layers"
+	_garuda_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_garuda_work" 2>/tmp/nb-garuda-mount.log; then
+		_garuda_mounted=1
+		mkdir -p "$_garuda_boot" "$_garuda_layers"
+	fi
+
+	if ! wgetgauge "$_garuda_iso_url" "$_garuda_iso" "Downloading $GARUDA_LABEL ISO"; then
+		nb_error "Could not download $GARUDA_LABEL ISO from:\n\n$_garuda_iso_url\n\nThis entry needs enough RAM to hold the ISO before kexec."
+		[ -n "$_garuda_mounted" ] && umount "$_garuda_work" 2>/dev/null || true
+		rm -rf "$_garuda_work"
+		return 1
+	fi
+
+	if ! "$_garuda_7z" e -y -o"$_garuda_boot" "$_garuda_iso" "$GARUDA_KERNEL_PATH" "$GARUDA_INITRD_PATH" >/tmp/nb-garuda-7z.log 2>&1; then
+		nb_error "Could not extract $GARUDA_LABEL boot files from the ISO.\nSee /tmp/nb-garuda-7z.log for details."
+		[ -n "$_garuda_mounted" ] && umount "$_garuda_work" 2>/dev/null || true
+		rm -rf "$_garuda_work"
+		return 1
+	fi
+	_garuda_kernel_file="${GARUDA_KERNEL_PATH##*/}"
+	_garuda_initrd_file="${GARUDA_INITRD_PATH##*/}"
+	if [ ! -s "$_garuda_boot/$_garuda_kernel_file" ] || [ ! -s "$_garuda_boot/$_garuda_initrd_file" ]; then
+		nb_error "The $GARUDA_LABEL ISO did not contain its expected kernel and initramfs."
+		[ -n "$_garuda_mounted" ] && umount "$_garuda_work" 2>/dev/null || true
+		rm -rf "$_garuda_work"
+		return 1
+	fi
+	mv "$_garuda_boot/$_garuda_kernel_file" /tmp/nb-linux
+	mv "$_garuda_boot/$_garuda_initrd_file" /tmp/nb-initrd
+	rm -rf "$_garuda_boot"
+
+	for _garuda_layer in rootfs desktopfs livefs ghtfs; do
+		_garuda_layer_path="$GARUDA_BASEDIR/$GARUDA_ARCH/$_garuda_layer.sfs"
+		if "$_garuda_7z" e -y -o"$_garuda_layers" "$_garuda_iso" "$_garuda_layer_path" >>/tmp/nb-garuda-7z.log 2>&1; then
+			[ -s "$_garuda_layers/$_garuda_layer.sfs" ] && continue
+		fi
+		if [ "$_garuda_layer" = "ghtfs" ]; then
+			continue
+		fi
+		nb_error "Could not extract $_garuda_layer.sfs from the $GARUDA_LABEL ISO.\nSee /tmp/nb-garuda-7z.log for details."
+		[ -n "$_garuda_mounted" ] && umount "$_garuda_work" 2>/dev/null || true
+		rm -rf "$_garuda_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	done
+	rm -f "$_garuda_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $GARUDA_LABEL live layers into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! garuda_repack_initrd_with_layers "$_garuda_layers"; then
+		[ -n "$_garuda_mounted" ] && umount "$_garuda_work" 2>/dev/null || true
+		rm -rf "$_garuda_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.new /tmp/nb-initrd.garuda
+		return 1
+	fi
+
+	rm -f "$_garuda_iso" /tmp/nb-garuda-7z.log /tmp/nb-garuda-mount.log
+	[ -n "$_garuda_mounted" ] && umount "$_garuda_work" 2>/dev/null || true
+	rm -rf "$_garuda_work"
 	return 0
 }
 
@@ -7152,8 +7506,10 @@ if [ "$DISTRO" = "communitylive" ];then
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
 	daphile-2505 "Daphile 25.05 x86_64 (music server)" \
 	ditana-09-beta "Ditana GNU/Linux 0.9 Beta" \
+	endeavouros-titan-neo-20260427 "EndeavourOS Titan Neo 2026.04.27" \
 	easyos-excalibur "EasyOS Excalibur 7.3.8" \
 	fatdog64-903 "Fatdog64 903" \
+	garuda-kde-lite-latest "Garuda KDE Lite latest" \
 	gobolinux-01701 "GoboLinux 017.01" \
 	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
 	keskos-layer-v3 "KeskOS Layer v3" \
@@ -7169,6 +7525,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	pikaos-niri "PikaOS 4.0 Niri" \
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
 	prismlinux-20260505 "PrismLinux 2026.05.05" \
+	rebornos-20260122 "RebornOS 2026.01.22" \
 	porteus-xfce-501 "Porteus 5.01 Xfce" \
 	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
@@ -7557,6 +7914,11 @@ elif [ -n "${GUIX_ISO_URL:-}" ]; then
 elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
 	if ! archiso_prepare_from_iso "$ARCHISO_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-archiso.iso
+		return 1
+	fi
+elif [ -n "${GARUDA_ISO_URL:-}" ]; then
+	if ! garuda_prepare_from_iso "$GARUDA_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-garuda.iso
 		return 1
 	fi
 elif [ -n "${PARABOLA_ISO_URL:-}" ]; then
