@@ -153,6 +153,13 @@ if [ ! -f "kexec-tools-${KEXEC_VER}.tar.xz" ]; then
     wget "https://mirrors.edge.kernel.org/pub/linux/utils/kernel/kexec/kexec-tools-${KEXEC_VER}.tar.xz"
 fi
 
+# --- Helper functions ---
+
+build_iso () {
+    local output="$1"
+    xorriso -as mkisofs         -r -J -l         -b boot/isolinux/isolinux.bin         -c boot/isolinux/boot.cat         -no-emul-boot -boot-load-size 4 -boot-info-table         -eltorito-alt-boot         -e efiboot.img         -no-emul-boot         -isohybrid-gpt-basdat         -o "$output"         "${WORK}/iso"
+}
+
 # --- Dependency checks ---
 NO=0
 for i in nbscript.sh tc-config.diff; do
@@ -412,17 +419,7 @@ cp -r "${WORK}/efifiles/EFI" "${WORK}/iso/"
 # xorriso marks the alt-boot entry as EFI automatically and writes a proper
 # GPT EFI System Partition entry; genisoimage/mkisofs do not set platform
 # ID 0xEF, so UEFI firmware skips those entries.
-xorriso -as mkisofs \
-    -r -J -l \
-    -b boot/isolinux/isolinux.bin \
-    -c boot/isolinux/boot.cat \
-    -no-emul-boot -boot-load-size 4 -boot-info-table \
-    -eltorito-alt-boot \
-    -e efiboot.img \
-    -no-emul-boot \
-    -isohybrid-gpt-basdat \
-    -o "${DONE}/NetbootCD-Neo-$NBCDVER.iso" \
-    "${WORK}/iso"
+build_iso "${DONE}/NetbootCD-Neo-$NBCDVER.iso"
 
 
 # --- Build wireless initrd ---
@@ -484,17 +481,7 @@ echo "Made wireless initrd: $(wc -c < "${DONE}/nbinit4-wifi.gz") bytes"
 # The EFI binary is reused as-is since grub.cfg references /boot/nbinit4.gz
 # by the same path in both ISOs.
 cp "${DONE}/nbinit4-wifi.gz" "${WORK}/iso/boot/nbinit4.gz"
-xorriso -as mkisofs \
-    -r -J -l \
-    -b boot/isolinux/isolinux.bin \
-    -c boot/isolinux/boot.cat \
-    -no-emul-boot -boot-load-size 4 -boot-info-table \
-    -eltorito-alt-boot \
-    -e efiboot.img \
-    -no-emul-boot \
-    -isohybrid-gpt-basdat \
-    -o "${DONE}/NetbootCD-Neo-$NBCDVER-wifi.iso" \
-    "${WORK}/iso"
+build_iso "${DONE}/NetbootCD-Neo-$NBCDVER-wifi.iso"
 
 chown -R 1000:1000 "${DONE}"
 

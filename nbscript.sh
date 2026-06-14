@@ -73,7 +73,7 @@ ubuntu_live_iso ()
 	KERNELURL="$1"
 	INITRDURL="$2"
 	getisourl "$3" "$4" || return 1
-	echo -n "root=/dev/ram0 ramdisk_size=3500000 ip=dhcp url=$ISOURL cloud-config-url=/dev/null ---" >>/tmp/nb-options
+	printf '%s' "root=/dev/ram0 ramdisk_size=3500000 ip=dhcp url=$ISOURL cloud-config-url=/dev/null ---" >>/tmp/nb-options
 }
 
 ubuntu_live_server ()
@@ -91,7 +91,7 @@ ubuntu_casper_iso_setup ()
 	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst casper/initrd.zstd live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst live/initrd.zstd boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst boot/initrd.zstd"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
 	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
-	echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
+	printf '%s' "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
 }
 
 dracut_live_iso_setup ()
@@ -106,7 +106,7 @@ dracut_live_iso_setup ()
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
 	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
-	echo -n "root=live:/LiveOS/squashfs.img ro rd.live.image rd.live.overlay.overlayfs=1 rd.luks=0 rd.md=0 rd.dm=0 $3 " >>/tmp/nb-options
+	printf '%s' "root=live:/LiveOS/squashfs.img ro rd.live.image rd.live.overlay.overlayfs=1 rd.luks=0 rd.md=0 rd.dm=0 $3 " >>/tmp/nb-options
 }
 
 gobolinux_iso_setup ()
@@ -121,7 +121,7 @@ gobolinux_iso_setup ()
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="gobolinux-live.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
 	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
-	echo -n "root=live:/gobolinux-live.img Boot=LiveCD vt.default_utf8=1 audit=0 rd.live.image rd.live.dir=/ rd.live.squashimg=gobolinux-live.img rd.live.overlay.overlayfs rd.luks=0 rd.lvm=0 rd.md=0 rd.dm=0 rd.live.ram=0 " >>/tmp/nb-options
+	printf '%s' "root=live:/gobolinux-live.img Boot=LiveCD vt.default_utf8=1 audit=0 rd.live.image rd.live.dir=/ rd.live.squashimg=gobolinux-live.img rd.live.overlay.overlayfs rd.luks=0 rd.lvm=0 rd.md=0 rd.dm=0 rd.live.ram=0 " >>/tmp/nb-options
 }
 
 adelie_iso_setup ()
@@ -136,7 +136,7 @@ adelie_iso_setup ()
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="x86_64.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
 	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
-	echo -n "root=live:/x86_64.img ro rd.live.overlay.overlayfs=1 softlevel=graphical " >>/tmp/nb-options
+	printf '%s' "root=live:/x86_64.img ro rd.live.overlay.overlayfs=1 softlevel=graphical " >>/tmp/nb-options
 }
 
 pika_iso_setup ()
@@ -145,7 +145,7 @@ pika_iso_setup ()
 	PIKA_ISO_URL="$2"
 	PIKA_ISO_FILE="$3"
 	PIKA_ISO_VOLUME="$4"
-	echo -n "VTOY_ISO_NAME=$PIKA_ISO_FILE ISO_LABEL_NAME=\"$PIKA_ISO_VOLUME\" boot=live booster.loadcdrom booster.skiproot " >>/tmp/nb-options
+	printf '%s' "VTOY_ISO_NAME=$PIKA_ISO_FILE ISO_LABEL_NAME=\"$PIKA_ISO_VOLUME\" boot=live booster.loadcdrom booster.skiproot " >>/tmp/nb-options
 }
 
 porteux_iso_setup ()
@@ -154,7 +154,7 @@ porteux_iso_setup ()
 	PORTEUX_ISO_URL="$2"
 	PORTEUX_KERNEL_PATH="$3"
 	PORTEUX_INITRD_PATH="$4"
-	echo -n "$5 " >>/tmp/nb-options
+	printf '%s' "$5 " >>/tmp/nb-options
 }
 
 porteus_iso_setup ()
@@ -163,7 +163,7 @@ porteus_iso_setup ()
 	PORTEUS_ISO_URL="$2"
 	PORTEUS_KERNEL_PATH="$3"
 	PORTEUS_INITRD_PATH="$4"
-	echo -n "$5 " >>/tmp/nb-options
+	printf '%s' "$5 " >>/tmp/nb-options
 }
 
 nemesis_iso_setup ()
@@ -172,7 +172,7 @@ nemesis_iso_setup ()
 	NEMESIS_ISO_URL="$2"
 	NEMESIS_KERNEL_PATH="$3"
 	NEMESIS_INITRD_PATH="$4"
-	echo -n "$5 " >>/tmp/nb-options
+	printf '%s' "$5 " >>/tmp/nb-options
 }
 
 chimera_iso_setup ()
@@ -181,7 +181,7 @@ chimera_iso_setup ()
 	CHIMERA_ISO_URL="$2"
 	CHIMERA_KERNEL_PATH="$3"
 	CHIMERA_INITRD_PATH="$4"
-	echo -n "boot=live live-media=CHIMERA_LIVE fromiso=/.netbootcd/chimera.iso dinit_skip_volumes init=/usr/bin/init loglevel=4 " >>/tmp/nb-options
+	printf '%s' "boot=live live-media=CHIMERA_LIVE fromiso=/.netbootcd/chimera.iso dinit_skip_volumes init=/usr/bin/init loglevel=4 " >>/tmp/nb-options
 }
 
 coyote_iso_setup ()
@@ -190,7 +190,7 @@ coyote_iso_setup ()
 	COYOTE_ISO_URL="$2"
 	COYOTE_KERNEL_PATH="$3"
 	COYOTE_INITRD_PATH="$4"
-	echo -n "console=tty0 quiet installer " >>/tmp/nb-options
+	printf '%s' "console=tty0 quiet installer " >>/tmp/nb-options
 }
 
 nutyx_iso_setup ()
@@ -200,7 +200,7 @@ nutyx_iso_setup ()
 	NUTYX_KERNEL_PATH="$3"
 	NUTYX_INITRD_PATH="$4"
 	NUTYX_ROOTFS_PATH="$5"
-	echo -n "ro quiet rootdelay=5 live " >>/tmp/nb-options
+	printf '%s' "ro quiet rootdelay=5 live " >>/tmp/nb-options
 }
 
 salix_iso_setup ()
@@ -209,7 +209,7 @@ salix_iso_setup ()
 	SALIX_ISO_URL="$2"
 	SALIX_KERNEL_PATH="$3"
 	SALIX_INITRD_PATH="$4"
-	echo -n "$5 " >>/tmp/nb-options
+	printf '%s' "$5 " >>/tmp/nb-options
 }
 
 venom_iso_setup ()
@@ -218,7 +218,7 @@ venom_iso_setup ()
 	VENOM_ISO_URL="$2"
 	VENOM_KERNEL_PATH="$3"
 	VENOM_INITRD_PATH="$4"
-	echo -n "ro quiet wait=15 " >>/tmp/nb-options
+	printf '%s' "ro quiet wait=15 " >>/tmp/nb-options
 }
 
 daphile_iso_setup ()
@@ -229,7 +229,7 @@ daphile_iso_setup ()
 	DAPHILE_INITRD_PATH="$4"
 	DAPHILE_ROOTFS_PATH="$5"
 	DAPHILE_VERSION_DIR="$6"
-	echo -n "daphile=$DAPHILE_VERSION_DIR vga=788 splash quiet panic=1 console=tty2 vt.global_cursor_default=0 i915.enable_fbc=0 threadirqs live " >>/tmp/nb-options
+	printf '%s' "daphile=$DAPHILE_VERSION_DIR vga=788 splash quiet panic=1 console=tty2 vt.global_cursor_default=0 i915.enable_fbc=0 threadirqs live " >>/tmp/nb-options
 }
 
 berry_iso_setup ()
@@ -239,7 +239,7 @@ berry_iso_setup ()
 	BERRY_KERNEL_PATH="Setup/vmlinuz"
 	BERRY_INITRD_PATH="Setup/initrd.gz"
 	BERRY_ROOTFS_PATH="BERRY/BERRY"
-	echo -n "quiet console=tty2 audit=0 rootwait ro noresume noswap boot=cdrom berry_dir=/BERRY/BERRY overlay=ram lang=us autologin clocksource=tsc nopti noibrs noibpb nospectre_v2 nospec_store_bypass_disable " >>/tmp/nb-options
+	printf '%s' "quiet console=tty2 audit=0 rootwait ro noresume noswap boot=cdrom berry_dir=/BERRY/BERRY overlay=ram lang=us autologin clocksource=tsc nopti noibrs noibpb nospectre_v2 nospec_store_bypass_disable " >>/tmp/nb-options
 }
 
 berry_extract_boot_file ()
@@ -340,7 +340,7 @@ community_live_iso_setup ()
 				"Fatdog64 903" \
 				"vmlinuz" \
 				"initrd"
-			echo -n "rootfstype=ramfs savefile=none " >>/tmp/nb-options
+			printf '%s' "rootfstype=ramfs savefile=none " >>/tmp/nb-options
 			;;
 		cachyos-desktop-260426)
 			archiso_live_iso_setup \
@@ -630,6 +630,129 @@ downloadandrun ()
 	return "$_nbscript_rc"
 }
 
+
+# --- POSIX initramfs helper functions ---
+
+# Verify the decompressor for the given initramfs format is available.
+# Args: format label
+nb_initrd_need_tool ()
+{
+	_nb_nt_format="$1"
+	_nb_nt_label="$2"
+	case "$_nb_nt_format" in
+		zstd)
+			if ! command -v zstd >/dev/null 2>&1; then
+				nb_error "$_nb_nt_label initramfs uses zstd compression, but zstd is not available."
+				return 1
+			fi
+			;;
+		xz)
+			if ! command -v xz >/dev/null 2>&1; then
+				nb_error "$_nb_nt_label initramfs uses xz compression, but xz is not available."
+				return 1
+			fi
+			;;
+	esac
+}
+
+# Unpack the main compressed archive from an initramfs image.
+# Args: input_file work_dir format offset [cpio_flags] [log_file]
+nb_initrd_unpack ()
+{
+	_nb_u_input="$1"
+	_nb_u_work="$2"
+	_nb_u_format="$3"
+	_nb_u_offset="$4"
+	_nb_u_cpio="${5:--idm}"
+	_nb_u_log="${6:-/dev/null}"
+
+	case "$_nb_u_format" in
+		gzip)
+			tail -c +"$(( _nb_u_offset + 1 ))" "$_nb_u_input" | gzip -cd | ( cd "$_nb_u_work" && cpio "$_nb_u_cpio" ) 2>"$_nb_u_log"
+			;;
+		zstd)
+			tail -c +"$(( _nb_u_offset + 1 ))" "$_nb_u_input" | zstd -dc | ( cd "$_nb_u_work" && cpio "$_nb_u_cpio" ) 2>"$_nb_u_log"
+			;;
+		xz)
+			tail -c +"$(( _nb_u_offset + 1 ))" "$_nb_u_input" | xz -dc | ( cd "$_nb_u_work" && cpio "$_nb_u_cpio" ) 2>"$_nb_u_log"
+			;;
+		cpio)
+			tail -c +"$(( _nb_u_offset + 1 ))" "$_nb_u_input" | ( cd "$_nb_u_work" && cpio "$_nb_u_cpio" ) 2>"$_nb_u_log"
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+# Repack an initramfs working directory into a compressed image.
+# Args: work_dir output_file format [mode]
+# Modes: standard (default), artix (gzip -c), fastxz (xz -0 -C crc32), nutyx (zstd -q -1 -c)
+nb_initrd_repack ()
+{
+	_nb_r_work="$1"
+	_nb_r_output="$2"
+	_nb_r_format="$3"
+	_nb_r_mode="${4:-standard}"
+
+	case "$_nb_r_format" in
+		gzip)
+			case "$_nb_r_mode" in
+				artix)
+					( cd "$_nb_r_work" && find . | cpio -o -H newc | gzip -c >"$_nb_r_output" )
+					;;
+				*)
+					( cd "$_nb_r_work" && find . | cpio -o -H newc | gzip -1 -c >"$_nb_r_output" )
+					;;
+			esac
+			;;
+		zstd)
+			case "$_nb_r_mode" in
+				nutyx)
+					( cd "$_nb_r_work" && find . | cpio -o -H newc | zstd -q -1 -c >"$_nb_r_output" )
+					;;
+				*)
+					( cd "$_nb_r_work" && find . | cpio -o -H newc | zstd -q -c >"$_nb_r_output" )
+					;;
+			esac
+			;;
+		xz)
+			case "$_nb_r_mode" in
+				fastxz)
+					( cd "$_nb_r_work" && find . | cpio -o -H newc | xz -0 -C crc32 -c >"$_nb_r_output" )
+					;;
+				*)
+					( cd "$_nb_r_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_nb_r_output" )
+					;;
+			esac
+			;;
+		cpio)
+			( cd "$_nb_r_work" && find . | cpio -o -H newc >"$_nb_r_output" )
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+# Preserve an early uncompressed initramfs prefix and append the repacked payload.
+# Args: output_file input_file offset repacked_file
+nb_initrd_prefix_append ()
+{
+	_nb_pa_output="$1"
+	_nb_pa_input="$2"
+	_nb_pa_offset="$3"
+	_nb_pa_repacked="$4"
+
+	: >"$_nb_pa_output"
+	if [ "$_nb_pa_offset" -gt 0 ]; then
+		if ! head -c "$_nb_pa_offset" "$_nb_pa_input" >>"$_nb_pa_output"; then
+			return 1
+		fi
+	fi
+	cat "$_nb_pa_repacked" >>"$_nb_pa_output"
+}
+
 debian_live_iso_setup ()
 {
 	_debian_live_tag="$1"
@@ -828,15 +951,15 @@ debian_live_iso_setup ()
 	esac
 
 	if [ "$DEBIAN_LIVE_MODE" = "embed" ]; then
-		echo -n "boot=live config components live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+		printf '%s' "boot=live config components live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	elif [ "$DEBIAN_LIVE_MODE" = "casper-embed" ]; then
-		echo -n "boot=casper live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+		printf '%s' "boot=casper live-media=/ noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	elif [ "$DEBIAN_LIVE_MODE" = "minios-embed" ]; then
-		echo -n "boot=live $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+		printf '%s' "boot=live $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	elif [ "$DEBIAN_LIVE_MODE" = "casper-url" ]; then
-		echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+		printf '%s' "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	else
-		echo -n "ip=dhcp boot=live config components fetch=$DEBIAN_LIVE_BOOT_URL ramdisk-size=85% noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
+		printf '%s' "ip=dhcp boot=live config components fetch=$DEBIAN_LIVE_BOOT_URL ramdisk-size=85% noeject noprompt $DEBIAN_LIVE_OPTIONS " >>/tmp/nb-options
 	fi
 }
 
@@ -896,48 +1019,18 @@ debian_live_repack_initrd_with_rootfs ()
 	_debian_live_format="${_debian_live_main_info%% *}"
 	_debian_live_main_offset="${_debian_live_main_info#* }"
 
-	if [ "$_debian_live_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$DEBIAN_LIVE_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_debian_live_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$DEBIAN_LIVE_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_debian_live_format" "$DEBIAN_LIVE_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new" "$_debian_live_final"
 	mkdir -p "$_debian_live_work"
 
-	case "$_debian_live_format" in
-		gzip)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL gzip initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL zstd initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL xz initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL cpio initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-		;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_debian_live_work" "$_debian_live_format" "$_debian_live_main_offset" "-idm" "/dev/null"; then
+		nb_error "Could not unpack the $DEBIAN_LIVE_LABEL $_debian_live_format initramfs."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
 
 	_debian_live_embed_rootfs="$_debian_live_work/$DEBIAN_LIVE_EMBED_ROOTFS_PATH"
 	_debian_live_embed_rootfs_dir="${_debian_live_embed_rootfs%/*}"
@@ -969,49 +1062,16 @@ debian_live_repack_initrd_with_rootfs ()
 			return 1
 		fi
 	done
-	case "$_debian_live_format" in
-		gzip)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | gzip -1 -c >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL gzip initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | zstd -q -c >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL zstd initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL xz initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL cpio initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_format" "standard"; then
+		nb_error "Could not repack the $DEBIAN_LIVE_LABEL $_debian_live_format initramfs."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
 
 	rm -rf "$_debian_live_work"
 
-	: >"$_debian_live_new"
-	if [ "$_debian_live_main_offset" -gt 0 ]; then
-		if ! head -c "$_debian_live_main_offset" /tmp/nb-initrd >>"$_debian_live_new"; then
-			nb_error "Could not preserve the $DEBIAN_LIVE_LABEL early initramfs prefix."
-			rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
-			return 1
-		fi
-	fi
-	if ! cat "$_debian_live_repacked" >>"$_debian_live_new"; then
-		nb_error "Could not write the repacked $DEBIAN_LIVE_LABEL initramfs."
+	if ! nb_initrd_prefix_append "$_debian_live_new" /tmp/nb-initrd "$_debian_live_main_offset" "$_debian_live_repacked"; then
+		nb_error "Could not preserve or write the DEBIAN_LIVE_LABEL initramfs."
 		rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
 		return 1
 	fi
@@ -1042,48 +1102,18 @@ debian_live_repack_initrd_with_minios_data ()
 	_debian_live_format="${_debian_live_main_info%% *}"
 	_debian_live_main_offset="${_debian_live_main_info#* }"
 
-	if [ "$_debian_live_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$DEBIAN_LIVE_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_debian_live_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$DEBIAN_LIVE_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_debian_live_format" "$DEBIAN_LIVE_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new" "$_debian_live_final"
 	mkdir -p "$_debian_live_work"
 
-	case "$_debian_live_format" in
-		gzip)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL gzip initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL zstd initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL xz initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _debian_live_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_debian_live_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $DEBIAN_LIVE_LABEL cpio initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_debian_live_work" "$_debian_live_format" "$_debian_live_main_offset" "-idm" "/dev/null"; then
+		nb_error "Could not unpack the $DEBIAN_LIVE_LABEL $_debian_live_format initramfs."
+		rm -rf "$_debian_live_work"
+		return 1
+	fi
 
 	if ! "$_debian_live_7z" x -y -o"$_debian_live_work" "$_debian_live_iso" "minios/*" >/tmp/nb-debian-live-7z.log 2>&1; then
 		nb_error "Could not extract MiniOS data from the $DEBIAN_LIVE_LABEL ISO.\nSee /tmp/nb-debian-live-7z.log for details."
@@ -1139,47 +1169,14 @@ debian_live_repack_initrd_with_minios_data ()
 	fi
 	chmod 755 "$_debian_live_minios_init"
 
-	case "$_debian_live_format" in
-		gzip)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | gzip -1 -c >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL gzip initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | zstd -q -c >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL zstd initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL xz initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc >"$_debian_live_repacked" ); then
-				nb_error "Could not repack the $DEBIAN_LIVE_LABEL cpio initramfs."
-				rm -rf "$_debian_live_work"
-				return 1
-			fi
-			;;
-	esac
-
-	: >"$_debian_live_new"
-	if [ "$_debian_live_main_offset" -gt 0 ]; then
-		if ! head -c "$_debian_live_main_offset" /tmp/nb-initrd >>"$_debian_live_new"; then
-			nb_error "Could not preserve the $DEBIAN_LIVE_LABEL early initramfs prefix."
-			rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
-			return 1
-		fi
+	if ! nb_initrd_repack "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_format" "standard"; then
+		nb_error "Could not repack the $DEBIAN_LIVE_LABEL $_debian_live_format initramfs."
+		rm -rf "$_debian_live_work"
+		return 1
 	fi
-	if ! cat "$_debian_live_repacked" >>"$_debian_live_new"; then
-		nb_error "Could not write the repacked $DEBIAN_LIVE_LABEL initramfs."
+
+	if ! nb_initrd_prefix_append "$_debian_live_new" /tmp/nb-initrd "$_debian_live_main_offset" "$_debian_live_repacked"; then
+		nb_error "Could not preserve or write the DEBIAN_LIVE_LABEL initramfs."
 		rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new"
 		return 1
 	fi
@@ -1302,12 +1299,7 @@ berry_repack_initrd_with_rootfs ()
 	_berry_format="${_berry_main_info%% *}"
 	_berry_main_offset="${_berry_main_info#* }"
 
-	if [ "$_berry_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$BERRY_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_berry_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$BERRY_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_berry_format" "$BERRY_LABEL"; then
 		return 1
 	fi
 
@@ -1381,47 +1373,14 @@ berry_repack_initrd_with_rootfs ()
 	mv "$_berry_work/init.new" "$_berry_work/init"
 	chmod 755 "$_berry_work/init"
 
-	case "$_berry_format" in
-		gzip)
-			if ! ( cd "$_berry_work" && find . | cpio -o -H newc | gzip -1 -c >"$_berry_repacked" ); then
-				nb_error "Could not repack the $BERRY_LABEL gzip initramfs."
-				rm -rf "$_berry_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_berry_work" && find . | cpio -o -H newc | zstd -q -c >"$_berry_repacked" ); then
-				nb_error "Could not repack the $BERRY_LABEL zstd initramfs."
-				rm -rf "$_berry_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_berry_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_berry_repacked" ); then
-				nb_error "Could not repack the $BERRY_LABEL xz initramfs."
-				rm -rf "$_berry_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_berry_work" && find . | cpio -o -H newc >"$_berry_repacked" ); then
-				nb_error "Could not repack the $BERRY_LABEL cpio initramfs."
-				rm -rf "$_berry_work"
-				return 1
-			fi
-			;;
-	esac
-
-	: >"$_berry_new"
-	if [ "$_berry_main_offset" -gt 0 ]; then
-		if ! head -c "$_berry_main_offset" /tmp/nb-initrd >>"$_berry_new"; then
-			nb_error "Could not preserve the $BERRY_LABEL early initramfs prefix."
-			rm -rf "$_berry_work" "$_berry_repacked" "$_berry_new"
-			return 1
-		fi
+	if ! nb_initrd_repack "$_berry_work" "$_berry_repacked" "$_berry_format" "standard"; then
+		nb_error "Could not repack the $BERRY_LABEL $_berry_format initramfs."
+		rm -rf "$_berry_work"
+		return 1
 	fi
-	if ! cat "$_berry_repacked" >>"$_berry_new"; then
-		nb_error "Could not write the repacked $BERRY_LABEL initramfs."
+
+	if ! nb_initrd_prefix_append "$_berry_new" /tmp/nb-initrd "$_berry_main_offset" "$_berry_repacked"; then
+		nb_error "Could not preserve or write the BERRY_LABEL initramfs."
 		rm -rf "$_berry_work" "$_berry_repacked" "$_berry_new"
 		return 1
 	fi
@@ -1508,12 +1467,7 @@ pika_repack_initrd_with_iso ()
 	_pika_format="${_pika_main_info%% *}"
 	_pika_main_offset="${_pika_main_info#* }"
 
-	if [ "$_pika_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$PIKA_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_pika_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$PIKA_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_pika_format" "$PIKA_LABEL"; then
 		return 1
 	fi
 
@@ -1631,36 +1585,11 @@ EOF
 		( cd "$_pika_work/usr/bin" && ln -s busybox sh ) 2>/dev/null || true
 	fi
 
-	case "$_pika_format" in
-		gzip)
-			if ! ( cd "$_pika_work" && find . | cpio -o -H newc | gzip -1 -c >"$_pika_repacked" ); then
-				nb_error "Could not repack the $PIKA_LABEL gzip initramfs."
-				rm -rf "$_pika_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_pika_work" && find . | cpio -o -H newc | zstd -q -c >"$_pika_repacked" ); then
-				nb_error "Could not repack the $PIKA_LABEL zstd initramfs."
-				rm -rf "$_pika_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_pika_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_pika_repacked" ); then
-				nb_error "Could not repack the $PIKA_LABEL xz initramfs."
-				rm -rf "$_pika_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_pika_work" && find . | cpio -o -H newc >"$_pika_repacked" ); then
-				nb_error "Could not repack the $PIKA_LABEL cpio initramfs."
-				rm -rf "$_pika_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_pika_work" "$_pika_repacked" "$_pika_format" "standard"; then
+		nb_error "Could not repack the $PIKA_LABEL $_pika_format initramfs."
+		rm -rf "$_pika_work"
+		return 1
+	fi
 
 	rm -rf "$_pika_work"
 
@@ -2057,12 +1986,7 @@ chimera_repack_initrd_with_iso ()
 	_chimera_format="${_chimera_main_info%% *}"
 	_chimera_main_offset="${_chimera_main_info#* }"
 
-	if [ "$_chimera_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$CHIMERA_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_chimera_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$CHIMERA_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_chimera_format" "$CHIMERA_LABEL"; then
 		return 1
 	fi
 
@@ -2129,32 +2053,11 @@ chimera_repack_initrd_with_iso ()
 		return 1
 	fi
 
-	case "$_chimera_format" in
-		gzip)
-			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc | gzip -1 -c >"$_chimera_repacked" ); then
-				nb_error "Could not repack the $CHIMERA_LABEL gzip initramfs."
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc | zstd -q -c >"$_chimera_repacked" ); then
-				nb_error "Could not repack the $CHIMERA_LABEL zstd initramfs."
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_chimera_repacked" ); then
-				nb_error "Could not repack the $CHIMERA_LABEL xz initramfs."
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_chimera_tree" && find . | cpio -o -H newc >"$_chimera_repacked" ); then
-				nb_error "Could not repack the $CHIMERA_LABEL cpio initramfs."
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_chimera_tree" "$_chimera_repacked" "$_chimera_format" "standard"; then
+		nb_error "Could not repack the $CHIMERA_LABEL $_chimera_format initramfs."
+		rm -rf "$_chimera_tree"
+		return 1
+	fi
 
 	rm -rf "$_chimera_tree"
 	: >"$_chimera_new"
@@ -2776,7 +2679,7 @@ archiso_live_iso_setup ()
 	ARCHISO_INITRD_PATH="$4"
 	ARCHISO_ROOTFS_PATH="$5"
 	ARCHISO_CHECKSUM_PATH="$6"
-	echo -n "$7 " >>/tmp/nb-options
+	printf '%s' "$7 " >>/tmp/nb-options
 }
 
 archiso_repack_initrd_with_rootfs ()
@@ -2793,48 +2696,18 @@ archiso_repack_initrd_with_rootfs ()
 	_archiso_format="${_archiso_main_info%% *}"
 	_archiso_main_offset="${_archiso_main_info#* }"
 
-	if [ "$_archiso_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$ARCHISO_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_archiso_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$ARCHISO_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_archiso_format" "$ARCHISO_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_archiso_work" "$_archiso_repacked" /tmp/nb-initrd.new
 	mkdir -p "$_archiso_work"
 
-	case "$_archiso_format" in
-		gzip)
-			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_archiso_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $ARCHISO_LABEL gzip initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_archiso_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $ARCHISO_LABEL zstd initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_archiso_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $ARCHISO_LABEL xz initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _archiso_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_archiso_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $ARCHISO_LABEL cpio initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_archiso_work" "$_archiso_format" "$_archiso_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $ARCHISO_LABEL $_archiso_format initramfs."
+		rm -rf "$_archiso_work"
+		return 1
+	fi
 
 	_archiso_rootfs_dest="$_archiso_work/$ARCHISO_ROOTFS_PATH"
 	_archiso_rootfs_dir="${_archiso_rootfs_dest%/*}"
@@ -2890,36 +2763,11 @@ EOFA
 		fi
 	fi
 
-	case "$_archiso_format" in
-		gzip)
-			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc | gzip -1 -c >"$_archiso_repacked" ); then
-				nb_error "Could not repack the $ARCHISO_LABEL gzip initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc | zstd -q -c >"$_archiso_repacked" ); then
-				nb_error "Could not repack the $ARCHISO_LABEL zstd initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_archiso_repacked" ); then
-				nb_error "Could not repack the $ARCHISO_LABEL xz initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_archiso_work" && find . | cpio -o -H newc >"$_archiso_repacked" ); then
-				nb_error "Could not repack the $ARCHISO_LABEL cpio initramfs."
-				rm -rf "$_archiso_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_archiso_work" "$_archiso_repacked" "$_archiso_format" "standard"; then
+		nb_error "Could not repack the $ARCHISO_LABEL $_archiso_format initramfs."
+		rm -rf "$_archiso_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_archiso_main_offset" -gt 0 ]; then
@@ -3037,7 +2885,7 @@ garuda_iso_setup ()
 	GARUDA_INITRD_PATH="$4"
 	GARUDA_BASEDIR="$5"
 	GARUDA_ARCH="$6"
-	echo -n "misobasedir=$GARUDA_BASEDIR root=miso:/dev/null checksum=n copytoram=n overlay_root_size=75% netbootcd_garuda=1 systemd.show_status=1 " >>/tmp/nb-options
+	printf '%s' "misobasedir=$GARUDA_BASEDIR root=miso:/dev/null checksum=n copytoram=n overlay_root_size=75% netbootcd_garuda=1 systemd.show_status=1 " >>/tmp/nb-options
 }
 
 garuda_patch_miso_scripts ()
@@ -3046,14 +2894,8 @@ garuda_patch_miso_scripts ()
 	_garuda_miso_script=
 	_garuda_parse_script=
 
-	for _garuda_candidate in $(find "$_garuda_initrd_work" -type f -name '*miso*.sh' 2>/dev/null); do
-		if [ -z "$_garuda_miso_script" ] && grep -q 'miso_mount_root' "$_garuda_candidate" 2>/dev/null; then
-			_garuda_miso_script="$_garuda_candidate"
-		fi
-		if [ -z "$_garuda_parse_script" ] && grep -q 'root#miso' "$_garuda_candidate" 2>/dev/null; then
-			_garuda_parse_script="$_garuda_candidate"
-		fi
-	done
+	_garuda_miso_script=$(find "$_garuda_initrd_work" -type f -name '*miso*.sh' -exec grep -l 'miso_mount_root' {} + 2>/dev/null | head -n 1)
+	_garuda_parse_script=$(find "$_garuda_initrd_work" -type f -name '*miso*.sh' -exec grep -l 'root#miso' {} + 2>/dev/null | head -n 1)
 
 	if [ -z "$_garuda_miso_script" ]; then
 		nb_error "Could not find the $GARUDA_LABEL miso mount script in the initramfs."
@@ -3166,48 +3008,18 @@ garuda_repack_initrd_with_layers ()
 	_garuda_format="${_garuda_main_info%% *}"
 	_garuda_main_offset="${_garuda_main_info#* }"
 
-	if [ "$_garuda_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$GARUDA_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_garuda_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$GARUDA_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_garuda_format" "$GARUDA_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_garuda_work" "$_garuda_repacked" /tmp/nb-initrd.new
 	mkdir -p "$_garuda_work"
 
-	case "$_garuda_format" in
-		gzip)
-			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_garuda_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GARUDA_LABEL gzip initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_garuda_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GARUDA_LABEL zstd initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_garuda_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GARUDA_LABEL xz initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _garuda_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_garuda_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GARUDA_LABEL cpio initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_garuda_work" "$_garuda_format" "$_garuda_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $GARUDA_LABEL $_garuda_format initramfs."
+		rm -rf "$_garuda_work"
+		return 1
+	fi
 
 	mkdir -p "$_garuda_work/$GARUDA_BASEDIR/$GARUDA_ARCH"
 	for _garuda_sfs in "$_garuda_layers"/*.sfs; do
@@ -3224,36 +3036,11 @@ garuda_repack_initrd_with_layers ()
 		return 1
 	fi
 
-	case "$_garuda_format" in
-		gzip)
-			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc | gzip -1 -c >"$_garuda_repacked" ); then
-				nb_error "Could not repack the $GARUDA_LABEL gzip initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc | zstd -q -c >"$_garuda_repacked" ); then
-				nb_error "Could not repack the $GARUDA_LABEL zstd initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_garuda_repacked" ); then
-				nb_error "Could not repack the $GARUDA_LABEL xz initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_garuda_work" && find . | cpio -o -H newc >"$_garuda_repacked" ); then
-				nb_error "Could not repack the $GARUDA_LABEL cpio initramfs."
-				rm -rf "$_garuda_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_garuda_work" "$_garuda_repacked" "$_garuda_format" "standard"; then
+		nb_error "Could not repack the $GARUDA_LABEL $_garuda_format initramfs."
+		rm -rf "$_garuda_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_garuda_main_offset" -gt 0 ]; then
@@ -3362,7 +3149,7 @@ parabola_iso_setup ()
 	PARABOLA_INITRD_PATH="$4"
 	PARABOLA_ROOTFS_PATH="$5"
 	PARABOLA_AITAB_PATH="$6"
-	echo -n "$7 " >>/tmp/nb-options
+	printf '%s' "$7 " >>/tmp/nb-options
 }
 
 parabola_repack_initrd_with_rootfs ()
@@ -3379,48 +3166,18 @@ parabola_repack_initrd_with_rootfs ()
 	_parabola_format="${_parabola_main_info%% *}"
 	_parabola_main_offset="${_parabola_main_info#* }"
 
-	if [ "$_parabola_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$PARABOLA_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_parabola_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$PARABOLA_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_parabola_format" "$PARABOLA_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_parabola_work" "$_parabola_repacked" /tmp/nb-initrd.new
 	mkdir -p "$_parabola_work"
 
-	case "$_parabola_format" in
-		gzip)
-			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_parabola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PARABOLA_LABEL gzip initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_parabola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PARABOLA_LABEL zstd initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_parabola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PARABOLA_LABEL xz initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _parabola_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_parabola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PARABOLA_LABEL cpio initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_parabola_work" "$_parabola_format" "$_parabola_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $PARABOLA_LABEL $_parabola_format initramfs."
+		rm -rf "$_parabola_work"
+		return 1
+	fi
 
 	mkdir -p "$_parabola_work/parabola/x86_64" "$_parabola_work/hooks"
 	if ! mv "$_parabola_rootfs" "$_parabola_work/parabola/x86_64/root-image.fs.sfs"; then
@@ -3477,36 +3234,11 @@ EOFP
 		fi
 	fi
 
-	case "$_parabola_format" in
-		gzip)
-			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc | gzip -1 -c >"$_parabola_repacked" ); then
-				nb_error "Could not repack the $PARABOLA_LABEL gzip initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc | zstd -q -c >"$_parabola_repacked" ); then
-				nb_error "Could not repack the $PARABOLA_LABEL zstd initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_parabola_repacked" ); then
-				nb_error "Could not repack the $PARABOLA_LABEL xz initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_parabola_work" && find . | cpio -o -H newc >"$_parabola_repacked" ); then
-				nb_error "Could not repack the $PARABOLA_LABEL cpio initramfs."
-				rm -rf "$_parabola_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_parabola_work" "$_parabola_repacked" "$_parabola_format" "standard"; then
+		nb_error "Could not repack the $PARABOLA_LABEL $_parabola_format initramfs."
+		rm -rf "$_parabola_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_parabola_main_offset" -gt 0 ]; then
@@ -3620,7 +3352,7 @@ hyperbola_iso_setup ()
 	HYPERBOLA_INITRD_PATH="$4"
 	HYPERBOLA_ROOTFS_PATH="$5"
 	HYPERBOLA_AITAB_PATH="$6"
-	echo -n "$7 " >>/tmp/nb-options
+	printf '%s' "$7 " >>/tmp/nb-options
 }
 
 hyperbola_repack_initrd_with_rootfs ()
@@ -3637,48 +3369,18 @@ hyperbola_repack_initrd_with_rootfs ()
 	_hyperbola_format="${_hyperbola_main_info%% *}"
 	_hyperbola_main_offset="${_hyperbola_main_info#* }"
 
-	if [ "$_hyperbola_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$HYPERBOLA_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_hyperbola_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$HYPERBOLA_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_hyperbola_format" "$HYPERBOLA_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_hyperbola_work" "$_hyperbola_repacked" /tmp/nb-initrd.new
 	mkdir -p "$_hyperbola_work"
 
-	case "$_hyperbola_format" in
-		gzip)
-			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $HYPERBOLA_LABEL gzip initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $HYPERBOLA_LABEL zstd initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $HYPERBOLA_LABEL xz initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _hyperbola_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_hyperbola_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $HYPERBOLA_LABEL cpio initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_hyperbola_work" "$_hyperbola_format" "$_hyperbola_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $HYPERBOLA_LABEL $_hyperbola_format initramfs."
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
 
 	mkdir -p "$_hyperbola_work/hyperbola/x86_64" "$_hyperbola_work/hooks"
 	if ! mv "$_hyperbola_rootfs" "$_hyperbola_work/hyperbola/x86_64/root-image.fs.sfs"; then
@@ -3735,36 +3437,11 @@ EOFP
 		fi
 	fi
 
-	case "$_hyperbola_format" in
-		gzip)
-			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc | gzip -1 -c >"$_hyperbola_repacked" ); then
-				nb_error "Could not repack the $HYPERBOLA_LABEL gzip initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc | zstd -q -c >"$_hyperbola_repacked" ); then
-				nb_error "Could not repack the $HYPERBOLA_LABEL zstd initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_hyperbola_repacked" ); then
-				nb_error "Could not repack the $HYPERBOLA_LABEL xz initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_hyperbola_work" && find . | cpio -o -H newc >"$_hyperbola_repacked" ); then
-				nb_error "Could not repack the $HYPERBOLA_LABEL cpio initramfs."
-				rm -rf "$_hyperbola_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_hyperbola_work" "$_hyperbola_repacked" "$_hyperbola_format" "standard"; then
+		nb_error "Could not repack the $HYPERBOLA_LABEL $_hyperbola_format initramfs."
+		rm -rf "$_hyperbola_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_hyperbola_main_offset" -gt 0 ]; then
@@ -3877,7 +3554,7 @@ mocaccino_live_iso_setup ()
 	MOCACCINO_KERNEL_PATH="$3"
 	MOCACCINO_INITRD_PATH="$4"
 	MOCACCINO_ROOTFS_PATH="$5"
-	echo -n "netbootcd_mocaccino=1 rootdelay=7 " >>/tmp/nb-options
+	printf '%s' "netbootcd_mocaccino=1 rootdelay=7 " >>/tmp/nb-options
 }
 
 mocaccino_repack_initrd_with_rootfs ()
@@ -3893,48 +3570,18 @@ mocaccino_repack_initrd_with_rootfs ()
 	_mocaccino_format="${_mocaccino_main_info%% *}"
 	_mocaccino_main_offset="${_mocaccino_main_info#* }"
 
-	if [ "$_mocaccino_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$MOCACCINO_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_mocaccino_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$MOCACCINO_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_mocaccino_format" "$MOCACCINO_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_mocaccino_work" "$_mocaccino_repacked" /tmp/nb-initrd.new
 	mkdir -p "$_mocaccino_work"
 
-	case "$_mocaccino_format" in
-		gzip)
-			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $MOCACCINO_LABEL gzip initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $MOCACCINO_LABEL zstd initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $MOCACCINO_LABEL xz initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _mocaccino_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_mocaccino_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $MOCACCINO_LABEL cpio initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_mocaccino_work" "$_mocaccino_format" "$_mocaccino_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $MOCACCINO_LABEL $_mocaccino_format initramfs."
+		rm -rf "$_mocaccino_work"
+		return 1
+	fi
 
 	if ! mv "$_mocaccino_rootfs" "$_mocaccino_work/rootfs.squashfs"; then
 		nb_error "Could not embed the $MOCACCINO_LABEL root filesystem."
@@ -3974,36 +3621,11 @@ mocaccino_repack_initrd_with_rootfs ()
 		chmod 755 "$_mocaccino_work/loader"
 	fi
 
-	case "$_mocaccino_format" in
-		gzip)
-			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc | gzip -1 -c >"$_mocaccino_repacked" ); then
-				nb_error "Could not repack the $MOCACCINO_LABEL gzip initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc | zstd -q -c >"$_mocaccino_repacked" ); then
-				nb_error "Could not repack the $MOCACCINO_LABEL zstd initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_mocaccino_repacked" ); then
-				nb_error "Could not repack the $MOCACCINO_LABEL xz initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_mocaccino_work" && find . | cpio -o -H newc >"$_mocaccino_repacked" ); then
-				nb_error "Could not repack the $MOCACCINO_LABEL cpio initramfs."
-				rm -rf "$_mocaccino_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_mocaccino_work" "$_mocaccino_repacked" "$_mocaccino_format" "standard"; then
+		nb_error "Could not repack the $MOCACCINO_LABEL $_mocaccino_format initramfs."
+		rm -rf "$_mocaccino_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_mocaccino_main_offset" -gt 0 ]; then
@@ -4114,7 +3736,7 @@ puppy_iso_setup ()
 	PUPPY_INITRD_PATH="$4"
 	shift 4
 	PUPPY_SFS_PATHS="$*"
-	echo -n "pfix=ram,fsck pmedia=cd net.ifnames=0 " >>/tmp/nb-options
+	printf '%s' "pfix=ram,fsck pmedia=cd net.ifnames=0 " >>/tmp/nb-options
 }
 
 puppy_repack_initrd_with_sfs ()
@@ -4142,36 +3764,11 @@ puppy_repack_initrd_with_sfs ()
 	rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
 	mkdir -p "$_puppy_work"
 
-	case "$_puppy_format" in
-		gzip)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL gzip initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL zstd initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL xz initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL cpio initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_puppy_work" "$_puppy_format" "$_puppy_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $PUPPY_LABEL $_puppy_format initramfs."
+		rm -rf "$_puppy_work"
+		return 1
+	fi
 
 	for _puppy_sfs in "$@"; do
 		if [ ! -s "$_puppy_sfs" ]; then
@@ -4203,36 +3800,11 @@ puppy_repack_initrd_with_sfs ()
 		chmod 755 "$_puppy_work/init"
 	fi
 
-	case "$_puppy_format" in
-		gzip)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | gzip -1 -c >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL gzip initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | zstd -q -c >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL zstd initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL xz initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL cpio initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_puppy_work" "$_puppy_repacked" "$_puppy_format" "standard"; then
+		nb_error "Could not repack the $PUPPY_LABEL $_puppy_format initramfs."
+		rm -rf "$_puppy_work"
+		return 1
+	fi
 
 	: >"$_puppy_new"
 	if [ "$_puppy_main_offset" -gt 0 ]; then
@@ -4357,9 +3929,9 @@ easyos_img_setup ()
 	EASYOS_WKG_UUID="$6"
 	EASYOS_WKG_DIR="$7"
 	EASYOS_WKG_LABEL="$8"
-	echo -n "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID " >>/tmp/nb-options
-	[ -n "$EASYOS_WKG_LABEL" ] && echo -n "wkg_label=$EASYOS_WKG_LABEL " >>/tmp/nb-options
-	echo -n "wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
+	printf '%s' "rw intel_iommu=igfx_off wkg_uuid=$EASYOS_WKG_UUID " >>/tmp/nb-options
+	[ -n "$EASYOS_WKG_LABEL" ] && printf '%s' "wkg_label=$EASYOS_WKG_LABEL " >>/tmp/nb-options
+	printf '%s' "wkg_dir=$EASYOS_WKG_DIR " >>/tmp/nb-options
 }
 
 easyos_repack_initrd_with_wkg_image ()
@@ -4388,36 +3960,11 @@ easyos_repack_initrd_with_wkg_image ()
 	rm -rf "$_easyos_work" "$_easyos_repacked" "$_easyos_new"
 	mkdir -p "$_easyos_work"
 
-	case "$_easyos_format" in
-		gzip)
-			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_easyos_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $EASYOS_LABEL gzip initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_easyos_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $EASYOS_LABEL zstd initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_easyos_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $EASYOS_LABEL xz initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _easyos_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_easyos_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $EASYOS_LABEL cpio initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_easyos_work" "$_easyos_format" "$_easyos_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $EASYOS_LABEL $_easyos_format initramfs."
+		rm -rf "$_easyos_work"
+		return 1
+	fi
 
 	if ! mv "$_easyos_wkg_image" "$_easyos_work/netbootcd-easyos-wkg.img"; then
 		nb_error "Could not embed the $EASYOS_LABEL working image."
@@ -4535,36 +4082,11 @@ esac
 		mv "$_easyos_work/inc/01resize-wkg.new" "$_easyos_work/inc/01resize-wkg"
 	fi
 
-	case "$_easyos_format" in
-		gzip)
-			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc | gzip -1 -c >"$_easyos_repacked" ); then
-				nb_error "Could not repack the $EASYOS_LABEL gzip initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc | zstd -q -c >"$_easyos_repacked" ); then
-				nb_error "Could not repack the $EASYOS_LABEL zstd initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_easyos_repacked" ); then
-				nb_error "Could not repack the $EASYOS_LABEL xz initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_easyos_work" && find . | cpio -o -H newc >"$_easyos_repacked" ); then
-				nb_error "Could not repack the $EASYOS_LABEL cpio initrd."
-				rm -rf "$_easyos_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_easyos_work" "$_easyos_repacked" "$_easyos_format" "standard"; then
+		nb_error "Could not repack the $EASYOS_LABEL $_easyos_format initramfs."
+		rm -rf "$_easyos_work"
+		return 1
+	fi
 
 	: >"$_easyos_new"
 	if [ "$_easyos_main_offset" -gt 0 ]; then
@@ -4669,7 +4191,7 @@ libreelec_img_setup ()
 	LIBREELEC_LABEL="$1"
 	LIBREELEC_IMG_URL="$2"
 	LIBREELEC_INIT_URL="$3"
-	echo -n "boot=NETBOOTCD BOOT_IMAGE=KERNEL SYSTEM_IMAGE=SYSTEM installer nofsck quiet systemd.debug_shell vga=current " >>/tmp/nb-options
+	printf '%s' "boot=NETBOOTCD BOOT_IMAGE=KERNEL SYSTEM_IMAGE=SYSTEM installer nofsck quiet systemd.debug_shell vga=current " >>/tmp/nb-options
 }
 
 libreelec_prepare_from_img ()
@@ -4963,7 +4485,7 @@ antix_mx_iso_setup ()
 	fi
 
 	ANTIX_MX_ISO_URL=$(antix_mx_iso_url "$_antix_mx_iso_file")
-	echo -n "from=all try=60 load=all sq=antiX/linuxfs quiet " >>/tmp/nb-options
+	printf '%s' "from=all try=60 load=all sq=antiX/linuxfs quiet " >>/tmp/nb-options
 }
 
 antix_mx_add_embedded_linuxfs_hook ()
@@ -5060,48 +4582,18 @@ antix_mx_repack_initrd_with_linuxfs ()
 	_antix_mx_format="${_antix_mx_main_info%% *}"
 	_antix_mx_main_offset="${_antix_mx_main_info#* }"
 
-	if [ "$_antix_mx_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$ANTIX_MX_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_antix_mx_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$ANTIX_MX_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_antix_mx_format" "$ANTIX_MX_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_antix_mx_work" "$_antix_mx_repacked"
 	mkdir -p "$_antix_mx_work"
 
-	case "$_antix_mx_format" in
-		gzip)
-			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_antix_mx_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $ANTIX_MX_LABEL gzip initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_antix_mx_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $ANTIX_MX_LABEL zstd initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_antix_mx_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $ANTIX_MX_LABEL xz initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _antix_mx_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_antix_mx_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the $ANTIX_MX_LABEL cpio initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_antix_mx_work" "$_antix_mx_format" "$_antix_mx_main_offset" "-idm" "/dev/null"; then
+		nb_error "Could not unpack the $ANTIX_MX_LABEL $_antix_mx_format initramfs."
+		rm -rf "$_antix_mx_work"
+		return 1
+	fi
 
 	mkdir -p "$_antix_mx_work/antiX"
 	if ! "$_antix_mx_7z" e -y -o"$_antix_mx_work/antiX" "$_antix_mx_iso" antiX/linuxfs >/tmp/nb-antix-mx-7z.log 2>&1; then
@@ -5118,36 +4610,11 @@ antix_mx_repack_initrd_with_linuxfs ()
 
 	antix_mx_add_embedded_linuxfs_hook "$_antix_mx_work"
 
-	case "$_antix_mx_format" in
-		gzip)
-			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc | gzip -1 -c >"$_antix_mx_repacked" ); then
-				nb_error "Could not repack the $ANTIX_MX_LABEL gzip initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc | zstd -q -c >"$_antix_mx_repacked" ); then
-				nb_error "Could not repack the $ANTIX_MX_LABEL zstd initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_antix_mx_repacked" ); then
-				nb_error "Could not repack the $ANTIX_MX_LABEL xz initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_antix_mx_work" && find . | cpio -o -H newc >"$_antix_mx_repacked" ); then
-				nb_error "Could not repack the $ANTIX_MX_LABEL cpio initramfs."
-				rm -rf "$_antix_mx_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_antix_mx_work" "$_antix_mx_repacked" "$_antix_mx_format" "standard"; then
+		nb_error "Could not repack the $ANTIX_MX_LABEL $_antix_mx_format initramfs."
+		rm -rf "$_antix_mx_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_antix_mx_main_offset" -gt 0 ]; then
@@ -5268,12 +4735,7 @@ daphile_repack_initrd_with_rootfs ()
 	_daphile_format="${_daphile_main_info%% *}"
 	_daphile_main_offset="${_daphile_main_info#* }"
 
-	if [ "$_daphile_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$DAPHILE_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_daphile_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$DAPHILE_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_daphile_format" "$DAPHILE_LABEL"; then
 		return 1
 	fi
 
@@ -5346,36 +4808,11 @@ daphile_repack_initrd_with_rootfs ()
 	fi
 	: >"$_daphile_work/boot/boot/live"
 
-	case "$_daphile_format" in
-		gzip)
-			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc | gzip -1 -c >"$_daphile_repacked" ); then
-				nb_error "Could not repack the $DAPHILE_LABEL gzip initramfs."
-				rm -rf "$_daphile_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc | zstd -q -c >"$_daphile_repacked" ); then
-				nb_error "Could not repack the $DAPHILE_LABEL zstd initramfs."
-				rm -rf "$_daphile_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_daphile_repacked" ); then
-				nb_error "Could not repack the $DAPHILE_LABEL xz initramfs."
-				rm -rf "$_daphile_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_daphile_work" && find . | cpio -o -H newc >"$_daphile_repacked" ); then
-				nb_error "Could not repack the $DAPHILE_LABEL cpio initramfs."
-				rm -rf "$_daphile_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_daphile_work" "$_daphile_repacked" "$_daphile_format" "standard"; then
+		nb_error "Could not repack the $DAPHILE_LABEL $_daphile_format initramfs."
+		rm -rf "$_daphile_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_daphile_main_offset" -gt 0 ]; then
@@ -5491,7 +4928,7 @@ void_iso_setup ()
 	fi
 
 	VOID_ISO_URL=$(void_iso_url "$_void_iso_file")
-	echo -n "root=live:/LiveOS/squashfs.img init=/sbin/init ro rd.luks=0 rd.md=0 rd.dm=0 rd.live.overlay.overlayfs=1 loglevel=4 vconsole.unicode=1 locale.LANG=en_US.UTF-8 " >>/tmp/nb-options
+	printf '%s' "root=live:/LiveOS/squashfs.img init=/sbin/init ro rd.luks=0 rd.md=0 rd.dm=0 rd.live.overlay.overlayfs=1 loglevel=4 vconsole.unicode=1 locale.LANG=en_US.UTF-8 " >>/tmp/nb-options
 }
 
 void_repack_initrd_with_iso ()
@@ -5523,36 +4960,11 @@ void_repack_initrd_with_iso ()
 	rm -rf "$_void_work" "$_void_repacked"
 	mkdir -p "$_void_work"
 
-	case "$_void_format" in
-		gzip)
-			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_void_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Void Linux gzip initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_void_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Void Linux zstd initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_void_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Void Linux xz initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _void_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_void_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Void Linux cpio initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_void_work" "$_void_format" "$_void_main_offset" "-idm" "/dev/null"; then
+		nb_error "Could not unpack the $VOID_LABEL $_void_format initramfs."
+		rm -rf "$_void_work"
+		return 1
+	fi
 
 	if ! "$_void_7z" x -y -o"$_void_work" "$_void_iso" LiveOS/squashfs.img >/tmp/nb-void-7z.log 2>&1; then
 		nb_error "Could not extract LiveOS/squashfs.img from the Void Linux ISO.\nSee /tmp/nb-void-7z.log for details."
@@ -5566,36 +4978,11 @@ void_repack_initrd_with_iso ()
 	fi
 	rm -f "$_void_iso"
 
-	case "$_void_format" in
-		gzip)
-			if ! ( cd "$_void_work" && find . | cpio -o -H newc | gzip -c >"$_void_repacked" ); then
-				nb_error "Could not repack the Void Linux gzip initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_void_work" && find . | cpio -o -H newc | zstd -q -c >"$_void_repacked" ); then
-				nb_error "Could not repack the Void Linux zstd initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_void_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_void_repacked" ); then
-				nb_error "Could not repack the Void Linux xz initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_void_work" && find . | cpio -o -H newc >"$_void_repacked" ); then
-				nb_error "Could not repack the Void Linux cpio initramfs."
-				rm -rf "$_void_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_void_work" "$_void_repacked" "$_void_format" "artix"; then
+		nb_error "Could not repack the $VOID_LABEL $_void_format initramfs."
+		rm -rf "$_void_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_void_main_offset" -gt 0 ]; then
@@ -5703,7 +5090,7 @@ altlinux_iso_setup ()
 
 	_altlinux_stage_iso_path="/sisyphus/current/$_altlinux_stage_iso_file"
 	# With method:http,type:iso, ramdisk_size makes ALT fetch /live instead of the ISO.
-	echo -n "fastboot live root=bootchain bootchain=fg,altboot ip=dhcp automatic=method:http,type:iso,server:nightly.altlinux.org,directory:$_altlinux_stage_iso_path stagename=live systemd.unit=install2.target lowmem lang=en_US " >>/tmp/nb-options
+	printf '%s' "fastboot live root=bootchain bootchain=fg,altboot ip=dhcp automatic=method:http,type:iso,server:nightly.altlinux.org,directory:$_altlinux_stage_iso_path stagename=live systemd.unit=install2.target lowmem lang=en_US " >>/tmp/nb-options
 }
 
 altlinux_prepare_from_iso ()
@@ -5745,48 +5132,18 @@ guix_repack_initrd_with_iso_root ()
 	_guix_format="${_guix_main_info%% *}"
 	_guix_main_offset="${_guix_main_info#* }"
 
-	if [ "$_guix_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$GUIX_LABEL initramfs uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_guix_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$GUIX_LABEL initramfs uses xz compression, but xz is not available."
+	if ! nb_initrd_need_tool "$_guix_format" "$GUIX_LABEL"; then
 		return 1
 	fi
 
 	rm -rf "$_guix_work" "$_guix_repacked"
 	mkdir -p "$_guix_work"
 
-	case "$_guix_format" in
-		gzip)
-			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_guix_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GUIX_LABEL gzip initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_guix_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GUIX_LABEL zstd initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_guix_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GUIX_LABEL xz initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _guix_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_guix_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $GUIX_LABEL cpio initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack /tmp/nb-initrd "$_guix_work" "$_guix_format" "$_guix_main_offset" "-idmu" "/dev/null"; then
+		nb_error "Could not unpack the $GUIX_LABEL $_guix_format initramfs."
+		rm -rf "$_guix_work"
+		return 1
+	fi
 
 	mkdir -p "$_guix_work/.netbootcd-modules"
 	for _guix_module_path in \
@@ -5965,36 +5322,11 @@ guix_repack_initrd_with_iso_root ()
               (loop)))))))
 EOFG
 
-	case "$_guix_format" in
-		gzip)
-			if ! ( cd "$_guix_work" && find . | cpio -o -H newc | gzip -1 -c >"$_guix_repacked" ); then
-				nb_error "Could not repack the $GUIX_LABEL gzip initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_guix_work" && find . | cpio -o -H newc | zstd -q -c >"$_guix_repacked" ); then
-				nb_error "Could not repack the $GUIX_LABEL zstd initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_guix_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_guix_repacked" ); then
-				nb_error "Could not repack the $GUIX_LABEL xz initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_guix_work" && find . | cpio -o -H newc >"$_guix_repacked" ); then
-				nb_error "Could not repack the $GUIX_LABEL cpio initramfs."
-				rm -rf "$_guix_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_guix_work" "$_guix_repacked" "$_guix_format" "standard"; then
+		nb_error "Could not repack the $GUIX_LABEL $_guix_format initramfs."
+		rm -rf "$_guix_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd.new
 	if [ "$_guix_main_offset" -gt 0 ]; then
@@ -6170,7 +5502,7 @@ artix_iso_setup ()
 	fi
 
 	ARTIX_ISO_URL=$(artix_iso_url "$_artix_iso_file")
-	echo -n "ip=dhcp artix_iso_url=$ARTIX_ISO_URL$(artix_dns_option) " >>/tmp/nb-options
+	printf '%s' "ip=dhcp artix_iso_url=$ARTIX_ISO_URL$(artix_dns_option) " >>/tmp/nb-options
 }
 
 artix_add_network_modules_overlay ()
@@ -6645,36 +5977,11 @@ artix_repack_initrd_fragments ()
 	rm -rf "$_artix_work" "$_artix_repacked" /tmp/nb-initrd
 	mkdir -p "$_artix_work"
 
-	case "$_artix_format" in
-		gzip)
-			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | gzip -cd | ( cd "$_artix_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Artix gzip initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | zstd -dc | ( cd "$_artix_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Artix zstd initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | xz -dc | ( cd "$_artix_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Artix xz initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _artix_main_offset + 1 ))" "$_artix_last" | ( cd "$_artix_work" && cpio -idm ) ); then
-				nb_error "Could not unpack the Artix cpio initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_unpack "$_artix_last" "$_artix_work" "$_artix_format" "$_artix_main_offset" "-idm" "/dev/null"; then
+		nb_error "Could not unpack the $ARTIX_LABEL $_artix_format initramfs."
+		rm -rf "$_artix_work"
+		return 1
+	fi
 
 	if ! ( cd "$_artix_work" && cpio -idmu </tmp/nb-artix-overlay.cpio ); then
 		nb_error "Could not merge the Artix ISO overlay into the initramfs."
@@ -6694,36 +6001,11 @@ artix_repack_initrd_fragments ()
 		fi
 	fi
 
-	case "$_artix_format" in
-		gzip)
-			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | gzip -c >"$_artix_repacked" ); then
-				nb_error "Could not repack the Artix gzip initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | zstd -q -c >"$_artix_repacked" ); then
-				nb_error "Could not repack the Artix zstd initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_artix_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_artix_repacked" ); then
-				nb_error "Could not repack the Artix xz initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_artix_work" && find . | cpio -o -H newc >"$_artix_repacked" ); then
-				nb_error "Could not repack the Artix cpio initramfs."
-				rm -rf "$_artix_work"
-				return 1
-			fi
-			;;
-	esac
+	if ! nb_initrd_repack "$_artix_work" "$_artix_repacked" "$_artix_format" "artix"; then
+		nb_error "Could not repack the $ARTIX_LABEL $_artix_format initramfs."
+		rm -rf "$_artix_work"
+		return 1
+	fi
 
 	: >/tmp/nb-initrd
 	_artix_i=1
@@ -7266,9 +6548,9 @@ if [ "$DISTRO" = "ubuntu" ];then
 			KERNELURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/linux"
 			INITRDURL="http://archive.ubuntu.com/ubuntu/dists/$VERSION/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64/initrd.gz"
 		fi
-		echo -n 'vga=normal quiet '>>/tmp/nb-options
+		printf '%s' 'vga=normal quiet '>>/tmp/nb-options
 		if dialog --yesno "Would you like to install language packs?\n(Choose no for a command-line system.)" 7 43;then
-			echo -n 'tasks=standard pkgsel/language-pack-patterns= pkgsel/install-language-support=false'>>/tmp/nb-options
+			printf '%s' 'tasks=standard pkgsel/language-pack-patterns= pkgsel/install-language-support=false'>>/tmp/nb-options
 		fi
 	fi
 fi
@@ -7389,7 +6671,7 @@ if [ "$DISTRO" = "ubuntuflavor" ];then
 			"Trisquel 12.0 NetInstall" \
 			"linux" \
 			"initrd.gz"
-		echo -n "vga=normal quiet " >>/tmp/nb-options
+		printf '%s' "vga=normal quiet " >>/tmp/nb-options
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
 	elif [ "$VERSION" = "voyager-26.04" ]; then
@@ -7432,7 +6714,7 @@ if [ "$DISTRO" = "debian" ];then
 	getversion || return 0
 	KERNELURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://http.us.debian.org/debian/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
-	echo -n 'vga=normal quiet '>>/tmp/nb-options
+	printf '%s' 'vga=normal quiet '>>/tmp/nb-options
 fi
 if [ "$DISTRO" = "devuan" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -7444,7 +6726,7 @@ if [ "$DISTRO" = "devuan" ];then
 	getversion || return 0
 	KERNELURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
 	INITRDURL="http://deb.devuan.org/devuan/dists/$VERSION/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
-	echo -n 'vga=normal quiet '>>/tmp/nb-options
+	printf '%s' 'vga=normal quiet '>>/tmp/nb-options
 fi
 
 if [ "$DISTRO" = "debianlive" ];then
@@ -7552,7 +6834,7 @@ if [ "$DISTRO" = "q4os" ];then
 	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6.6-5d30850e"
 	KERNELURL="$BASE/vmlinuz"
 	INITRDURL="$BASE/initrd"
-	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
+	printf '%s' "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
 fi
 if [ "$DISTRO" = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -7563,7 +6845,7 @@ if [ "$DISTRO" = "fedora" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
-	echo -n "inst.stage2=$SERVER" >>/tmp/nb-options
+	printf '%s' "inst.stage2=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "opensuse" ];then
@@ -7578,9 +6860,9 @@ if [ "$DISTRO" = "opensuse" ];then
 	fi
 	KERNELURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/linux"
 	INITRDURL="http://download.opensuse.org/$VERSION/repo/oss/boot/x86_64/loader/initrd"
-	echo -n 'splash=silent showopts '>>/tmp/nb-options
+	printf '%s' 'splash=silent showopts '>>/tmp/nb-options
 	dialog --inputbox "Where do you want to install openSUSE from?" 8 70 "http://download.opensuse.org/$VERSION/repo/oss" 2>/tmp/nb-server || { rm -f /tmp/nb-server; return; }
-	echo -n "install=$(cat /tmp/nb-server)" >>/tmp/nb-options
+	printf '%s' "install=$(cat /tmp/nb-server)" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "mageia" ];then
@@ -7592,7 +6874,7 @@ if [ "$DISTRO" = "mageia" ];then
 	getversion || return 0
 	KERNELURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/vmlinuz"
 	INITRDURL="http://mirrors.kernel.org/mageia/distrib/$VERSION/x86_64/isolinux/x86_64/all.rdz"
-	echo -n 'automatic=method:http' >>/tmp/nb-options
+	printf '%s' 'automatic=method:http' >>/tmp/nb-options
 fi
 if [ "$DISTRO" = "rhel-type-10" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
@@ -7615,7 +6897,7 @@ if [ "$DISTRO" = "rhel-type-10" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
-	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
+	printf '%s' "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "rhel-type-9" ];then
@@ -7639,7 +6921,7 @@ if [ "$DISTRO" = "rhel-type-9" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
+	printf '%s' "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "rhel-type-8" ];then
@@ -7660,7 +6942,7 @@ if [ "$DISTRO" = "rhel-type-8" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/isolinux/vmlinuz"
 	INITRDURL="$SERVER/isolinux/initrd.img"
-	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
+	printf '%s' "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "cloudlinux" ];then
@@ -7672,7 +6954,7 @@ if [ "$DISTRO" = "cloudlinux" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
-	echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
+	printf '%s' "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "rhel-extra" ];then
@@ -7739,11 +7021,11 @@ if [ "$DISTRO" = "rhel-extra" ];then
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
 	if [ "$VERSION" = "smeserver-11.0-beta1" ];then
-		echo -n "ip=dhcp initcall_blacklist=clocksource_done_booting inst.stage2=$SERVER inst.repo=$SERVER quiet" >>/tmp/nb-options
+		printf '%s' "ip=dhcp initcall_blacklist=clocksource_done_booting inst.stage2=$SERVER inst.repo=$SERVER quiet" >>/tmp/nb-options
 	elif [ "$VERSION" = "tencentos-4" ] || [ "$VERSION" = "tencentos-3.3" ];then
-		echo -n "ip=dhcp nomodeset inst.stage2=$SERVER inst.repo=$SERVER inst.noverifyssl" >>/tmp/nb-options
+		printf '%s' "ip=dhcp nomodeset inst.stage2=$SERVER inst.repo=$SERVER inst.noverifyssl" >>/tmp/nb-options
 	else
-		echo -n "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
+		printf '%s' "nomodeset inst.repo=$SERVER" >>/tmp/nb-options
 	fi
 	rm /tmp/nb-server
 fi
@@ -7759,7 +7041,7 @@ if [ "$DISTRO" = "openeuler" ];then
 	SERVER=$(cat /tmp/nb-server)
 	KERNELURL="$SERVER/images/pxeboot/vmlinuz"
 	INITRDURL="$SERVER/images/pxeboot/initrd.img"
-	echo -n "inst.repo=$SERVER" >>/tmp/nb-options
+	printf '%s' "inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
 if [ "$DISTRO" = "arch" ];then
@@ -7771,11 +7053,11 @@ if [ "$DISTRO" = "arch" ];then
 		BASE="https://release.archboot.com/x86_64/latest/ipxe"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/amd-ucode.img $BASE/intel-ucode.img $BASE/initrd-latest-x86_64.img"
-		echo -n 'vga=normal quiet ip=dhcp net.ifnames=0 '>>/tmp/nb-options
+		printf '%s' 'vga=normal quiet ip=dhcp net.ifnames=0 '>>/tmp/nb-options
 	else
 		KERNELURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/vmlinuz-linux"
 		INITRDURL="http://mirror.rackspace.com/archlinux/iso/$VERSION/arch/boot/x86_64/initramfs-linux.img"
-		echo -n 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
+		printf '%s' 'vga=normal quiet archiso_http_srv=http://mirror.rackspace.com/archlinux/iso/latest/ archisobasedir=arch verify=n ip=dhcp net.ifnames=0 BOOTIF=01-${netX/mac} boot '>>/tmp/nb-options
 	fi
 fi
 if [ "$DISTRO" = "artix" ];then
@@ -7832,11 +7114,11 @@ if [ "$DISTRO" = "slackware" ];then
 	if [ "$VERSION" = "slackware64-current" ];then
 		KERNELURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/generic.s/bzImage"
 		INITRDURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
-		echo -n "rw printk.time=0 nomodeset SLACK_KERNEL=generic.s" >>/tmp/nb-options
+		printf '%s' "rw printk.time=0 nomodeset SLACK_KERNEL=generic.s" >>/tmp/nb-options
 	else
 		KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/huge.s/bzImage"
 		INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
-		echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
+		printf '%s' "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
 	fi
 fi
 if [ "$DISTRO" = "rescue" ];then
@@ -7854,21 +7136,21 @@ if [ "$DISTRO" = "rescue" ];then
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
-		echo -n "boot=live fetch=$SQUASH union=overlay username=user vga=788" >>/tmp/nb-options
+		printf '%s' "boot=live fetch=$SQUASH union=overlay username=user vga=788" >>/tmp/nb-options
 	fi
 	if [ "$DISTRO" = "clonezilla-deb" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/3.3.1-35-1a41a72c"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
-		echo -n "boot=live username=user union=overlay config components noswap edd=on nomodeset ocs_live_run=ocs-live-general ocs_live_batch=no net.ifnames=0 nosplash noprompt fetch=$SQUASH" >>/tmp/nb-options
+		printf '%s' "boot=live username=user union=overlay config components noswap edd=on nomodeset ocs_live_run=ocs-live-general ocs_live_batch=no net.ifnames=0 nosplash noprompt fetch=$SQUASH" >>/tmp/nb-options
 	fi
 	if [ "$DISTRO" = "rescuezilla" ];then
 		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/2.6.1-123ed276"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
-		echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
+		printf '%s' "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
 	fi
 	if [ "$DISTRO" = "4mlinux" ];then
 		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/51.0-fcaac630"
@@ -7880,14 +7162,14 @@ if [ "$DISTRO" = "rescue" ];then
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
-		echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
+		printf '%s' "boot=live fetch=$SQUASH" >>/tmp/nb-options
 	fi
 	if [ "$DISTRO" = "grml-small" ];then
 		BASE="https://github.com/netbootxyz/debian-squash/releases/download/2026.04-410a8803"
 		KERNELURL="$BASE/vmlinuz"
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
-		echo -n "boot=live fetch=$SQUASH" >>/tmp/nb-options
+		printf '%s' "boot=live fetch=$SQUASH" >>/tmp/nb-options
 	fi
 fi
 askforopts
@@ -8100,7 +7382,7 @@ fi
 if [ "$EFIMODE" = 1 ]; then
 	case "$DISTRO" in
 		fedora64|rhel-type-*-64)
-			echo -n ' inst.efi' >>/tmp/nb-options
+			printf '%s' ' inst.efi' >>/tmp/nb-options
 			;;
 	esac
 fi
