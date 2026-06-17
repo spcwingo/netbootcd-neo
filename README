@@ -8,11 +8,9 @@ Unlike the original NetbootCD, NetbootCD-Neo supports both BIOS and UEFI systems
 
 To build, run as root or use fakeroot:
 
-```sh
 cd ~/Downloads/netbootcd-neo
 sudo ./Build.sh
 # or
 fakeroot ./Build.sh
-```
 
 Of course that's assuming the extracted folder is in your Downloads directory. Adjust as necessary.
