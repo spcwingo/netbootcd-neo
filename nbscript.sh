@@ -6887,6 +6887,321 @@ wgetgauge ()
 	_rc=$(cat /tmp/nb-wget-rc 2>/dev/null || echo 1)
 	rm -f /tmp/nb-wget-rc
 	return "$_rc"
+systemrescue_prepare_from_iso ()
+{
+	_systemrescue_iso_url="$1"
+	_systemrescue_work="/tmp/nb-systemrescue-work"
+	_systemrescue_iso="$_systemrescue_work/nb-systemrescue.iso"
+	_systemrescue_extract="$_systemrescue_work/extract"
+
+	if ! _systemrescue_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract SystemRescue boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+	rm -rf "$_systemrescue_work"
+	mkdir -p "$_systemrescue_extract"
+
+	if ! wgetgauge "$_systemrescue_iso_url" "$_systemrescue_iso" "Downloading SystemRescue ISO"; then
+		nb_error "Could not download SystemRescue ISO from:\n\n$_systemrescue_iso_url"
+		rm -rf "$_systemrescue_work"
+		return 1
+	fi
+
+	if ! "$_systemrescue_7z" e -y -o"$_systemrescue_extract" "$_systemrescue_iso" \
+		sysresccd/boot/x86_64/vmlinuz \
+		sysresccd/boot/intel_ucode.img \
+		sysresccd/boot/amd_ucode.img \
+		sysresccd/boot/x86_64/sysresccd.img >/tmp/nb-systemrescue-7z.log 2>&1; then
+		nb_error "Could not extract SystemRescue boot files from the ISO.\nSee /tmp/nb-systemrescue-7z.log for details."
+		rm -rf "$_systemrescue_work"
+		return 1
+	fi
+
+	if [ ! -s "$_systemrescue_extract/vmlinuz" ] || \
+		[ ! -s "$_systemrescue_extract/intel_ucode.img" ] || \
+		[ ! -s "$_systemrescue_extract/amd_ucode.img" ] || \
+		[ ! -s "$_systemrescue_extract/sysresccd.img" ]; then
+		nb_error "The SystemRescue ISO did not contain the expected boot files."
+		rm -rf "$_systemrescue_work"
+		return 1
+	fi
+
+	mv "$_systemrescue_extract/vmlinuz" /tmp/nb-linux
+	mv "$_systemrescue_extract/intel_ucode.img" /tmp/nb-initrd.1
+	mv "$_systemrescue_extract/amd_ucode.img" /tmp/nb-initrd.2
+	mv "$_systemrescue_extract/sysresccd.img" /tmp/nb-initrd.3
+	combine_initrd_fragments 3
+
+	rm -f "$_systemrescue_iso" /tmp/nb-systemrescue-7z.log
+	rm -rf "$_systemrescue_work"
+	return 0
+}
+
+
+puppy_iso_setup ()
+{
+	PUPPY_LABEL="$1"
+	PUPPY_ISO_URL="$2"
+	PUPPY_KERNEL_PATH="$3"
+	PUPPY_INITRD_PATH="$4"
+	shift 4
+	PUPPY_SFS_PATHS="$*"
+	PUPPY_EXTRA_INITRD_PATH=
+	echo -n "pfix=ram,fsck pmedia=cd net.ifnames=0 " >>/tmp/nb-options
+}
+
+
+puppy_repack_initrd_with_sfs ()
+{
+	_puppy_work="/tmp/nb-puppy-work/initrd-work"
+	_puppy_repacked="/tmp/nb-puppy-work/nb-initrd.puppy"
+	_puppy_new="/tmp/nb-puppy-work/nb-initrd.new"
+
+	if ! _puppy_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
+		nb_error "Could not determine the $PUPPY_LABEL initrd compression format."
+		return 1
+	fi
+	_puppy_format="${_puppy_main_info%% *}"
+	_puppy_main_offset="${_puppy_main_info#* }"
+
+	if [ "$_puppy_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$PUPPY_LABEL initrd uses zstd compression, but zstd is not available."
+		return 1
+	fi
+	if [ "$_puppy_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
+		nb_error "$PUPPY_LABEL initrd uses xz compression, but xz is not available."
+		return 1
+	fi
+
+	rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
+	mkdir -p "$_puppy_work"
+
+	case "$_puppy_format" in
+		gzip)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL gzip initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL zstd initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL xz initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_puppy_work" && cpio -idmu ) ); then
+				nb_error "Could not unpack the $PUPPY_LABEL cpio initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+	esac
+
+	for _puppy_sfs in "$@"; do
+		if [ ! -s "$_puppy_sfs" ]; then
+			nb_error "Could not find an extracted $PUPPY_LABEL SFS file: $_puppy_sfs"
+			rm -rf "$_puppy_work"
+			return 1
+		fi
+		_puppy_sfs_file="${_puppy_sfs##*/}"
+		if ! mv "$_puppy_sfs" "$_puppy_work/$_puppy_sfs_file"; then
+			nb_error "Could not embed $_puppy_sfs_file into the $PUPPY_LABEL initrd."
+			rm -rf "$_puppy_work"
+			return 1
+		fi
+	done
+
+	if [ -f "$_puppy_work/init" ] && ! grep -q 'netbootcd_puppy_tmpfs_sfs' "$_puppy_work/init"; then
+		if ! sed '/^stack_onepupdrv() {/,/^copy_onepupdrv() {/{
+/^ ONE_BASENAME="$(basename $ONE_REL_FN)"$/a\
+ # netbootcd_puppy_tmpfs_sfs\
+ if [ ! -s "$ONE_FN" ] && [ -f "/mnt/tmpfs/$ONE_BASENAME" ]; then\
+  ONE_FN="/mnt/tmpfs/$ONE_BASENAME"\
+ fi
+}' "$_puppy_work/init" >"$_puppy_work/init.new"; then
+			nb_error "Could not patch the $PUPPY_LABEL humongous-initrd loader."
+			rm -rf "$_puppy_work" "$_puppy_work/init.new"
+			return 1
+		fi
+		mv "$_puppy_work/init.new" "$_puppy_work/init"
+		chmod 755 "$_puppy_work/init"
+	fi
+
+	case "$_puppy_format" in
+		gzip)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | gzip -1 -c >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL gzip initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		zstd)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | zstd -q -c >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL zstd initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		xz)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL xz initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+		cpio)
+			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc >"$_puppy_repacked" ); then
+				nb_error "Could not repack the $PUPPY_LABEL cpio initrd."
+				rm -rf "$_puppy_work"
+				return 1
+			fi
+			;;
+	esac
+
+	: >"$_puppy_new"
+	if [ "$_puppy_main_offset" -gt 0 ]; then
+		if ! head -c "$_puppy_main_offset" /tmp/nb-initrd >>"$_puppy_new"; then
+			nb_error "Could not preserve the $PUPPY_LABEL early initrd prefix."
+			rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
+			return 1
+		fi
+	fi
+	if ! cat "$_puppy_repacked" >>"$_puppy_new"; then
+		nb_error "Could not write the repacked $PUPPY_LABEL initrd."
+		rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
+		return 1
+	fi
+
+	mv "$_puppy_new" /tmp/nb-initrd
+	rm -rf "$_puppy_work" "$_puppy_repacked"
+	return 0
+}
+
+
+puppy_prepare_from_iso ()
+{
+	_puppy_iso_url="$1"
+	_puppy_work="/tmp/nb-puppy-work"
+	_puppy_iso="$_puppy_work/nb-puppy.iso"
+	_puppy_boot="$_puppy_work/boot"
+	_puppy_sfs_dir="$_puppy_work/sfs"
+
+	if ! _puppy_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $PUPPY_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+	rm -rf "$_puppy_work" /tmp/nb-initrd.puppy /tmp/nb-initrd.new
+	mkdir -p "$_puppy_boot" "$_puppy_sfs_dir"
+	_puppy_mounted=
+	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_puppy_work" 2>/tmp/nb-puppy-mount.log; then
+		_puppy_mounted=1
+		mkdir -p "$_puppy_boot" "$_puppy_sfs_dir"
+	fi
+
+	if ! wgetgauge "$_puppy_iso_url" "$_puppy_iso" "Downloading $PUPPY_LABEL ISO"; then
+		nb_error "Could not download $PUPPY_LABEL ISO from:\n\n$_puppy_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		return 1
+	fi
+
+	if ! "$_puppy_7z" e -y -o"$_puppy_boot" "$_puppy_iso" "$PUPPY_KERNEL_PATH" "$PUPPY_INITRD_PATH" >/tmp/nb-puppy-7z.log 2>&1; then
+		nb_error "Could not extract $PUPPY_LABEL boot files from the ISO.\nSee /tmp/nb-puppy-7z.log for details."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		return 1
+	fi
+	_puppy_kernel_file="${PUPPY_KERNEL_PATH##*/}"
+	_puppy_initrd_file="${PUPPY_INITRD_PATH##*/}"
+	if [ ! -s "$_puppy_boot/$_puppy_kernel_file" ] || [ ! -s "$_puppy_boot/$_puppy_initrd_file" ]; then
+		nb_error "The $PUPPY_LABEL ISO did not contain its expected kernel and initrd."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		return 1
+	fi
+	mv "$_puppy_boot/$_puppy_kernel_file" /tmp/nb-linux
+	mv "$_puppy_boot/$_puppy_initrd_file" /tmp/nb-initrd.1
+
+	if [ -n "${PUPPY_EXTRA_INITRD_PATH:-}" ]; then
+		if ! "$_puppy_7z" e -y -o"$_puppy_boot" "$_puppy_iso" "$PUPPY_EXTRA_INITRD_PATH" >>/tmp/nb-puppy-7z.log 2>&1; then
+			nb_error "Could not extract $PUPPY_EXTRA_INITRD_PATH from the $PUPPY_LABEL ISO.\nSee /tmp/nb-puppy-7z.log for details."
+			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+			rm -rf "$_puppy_work"
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+			return 1
+		fi
+		_puppy_extra_file="${PUPPY_EXTRA_INITRD_PATH##*/}"
+		if [ ! -s "$_puppy_boot/$_puppy_extra_file" ]; then
+			nb_error "The $PUPPY_LABEL ISO did not contain $PUPPY_EXTRA_INITRD_PATH."
+			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+			rm -rf "$_puppy_work"
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+			return 1
+		fi
+		mv /tmp/nb-initrd.1 /tmp/nb-initrd.2
+		mv "$_puppy_boot/$_puppy_extra_file" /tmp/nb-initrd.1
+		combine_initrd_fragments 2
+	else
+		mv /tmp/nb-initrd.1 /tmp/nb-initrd
+	fi
+	rm -rf "$_puppy_boot"
+
+	_puppy_sfs_files=
+	for _puppy_sfs_path in $PUPPY_SFS_PATHS; do
+		if ! "$_puppy_7z" e -y -o"$_puppy_sfs_dir" "$_puppy_iso" "$_puppy_sfs_path" >>/tmp/nb-puppy-7z.log 2>&1; then
+			nb_error "Could not extract $_puppy_sfs_path from the $PUPPY_LABEL ISO.\nSee /tmp/nb-puppy-7z.log for details."
+			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+			rm -rf "$_puppy_work"
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+			return 1
+		fi
+		_puppy_sfs_file="${_puppy_sfs_path##*/}"
+		if [ ! -s "$_puppy_sfs_dir/$_puppy_sfs_file" ]; then
+			nb_error "The $PUPPY_LABEL ISO did not contain $_puppy_sfs_path."
+			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+			rm -rf "$_puppy_work"
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+			return 1
+		fi
+		_puppy_sfs_files="$_puppy_sfs_files $_puppy_sfs_dir/$_puppy_sfs_file"
+	done
+
+	if [ -z "$_puppy_sfs_files" ]; then
+		nb_error "No $PUPPY_LABEL SFS files were selected for embedding."
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+		return 1
+	fi
+	rm -f "$_puppy_iso"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $PUPPY_LABEL SFS files into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! puppy_repack_initrd_with_sfs $_puppy_sfs_files; then
+		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+		rm -rf "$_puppy_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+		return 1
+	fi
+
+	rm -f "$_puppy_iso" /tmp/nb-puppy-7z.log /tmp/nb-puppy-mount.log
+	[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
+	rm -rf "$_puppy_work"
+	return 0
 }
 
 
@@ -7188,6 +7503,13 @@ ANTIX_MX_LABEL=
 DEBIAN_LIVE_ISO_URL=
 DEBIAN_LIVE_BOOT_URL=
 DEBIAN_LIVE_MODE=
+SYSTEMRESCUE_ISO_URL=
+PUPPY_ISO_URL=
+PUPPY_LABEL=
+PUPPY_KERNEL_PATH=
+PUPPY_INITRD_PATH=
+PUPPY_SFS_PATHS=
+PUPPY_EXTRA_INITRD_PATH=
 dialog --backtitle "$TITLE" --menu "Choose a distribution:" 24 75 20 \
 ubuntu "Ubuntu" \
 ubuntuflavor "Ubuntu flavors and derivatives" \
@@ -7901,14 +8223,14 @@ elif [ -n "${VOID_ISO_URL:-}" ]; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-void.iso
 		return 1
 	fi
-elif [ -n "${ALTLINUX_ISO_URL:-}" ]; then
-	if ! altlinux_prepare_from_iso "$ALTLINUX_ISO_URL"; then
-		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-altlinux.iso
-		return 1
-	fi
-elif [ -n "${GUIX_ISO_URL:-}" ]; then
-	if ! guix_prepare_from_iso "$GUIX_ISO_URL"; then
-		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-guix.iso
+	elif [ -n "${ALTLINUX_ISO_URL:-}" ]; then
+		if ! altlinux_prepare_from_iso "$ALTLINUX_ISO_URL"; then
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-altlinux.iso
+			return 1
+		fi
+	elif [ -n "${GUIX_ISO_URL:-}" ]; then
+		if ! guix_prepare_from_iso "$GUIX_ISO_URL"; then
+			rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-guix.iso
 		return 1
 	fi
 elif [ -n "${ARCHISO_ISO_URL:-}" ]; then
@@ -7991,6 +8313,11 @@ elif [ -n "${VENOM_ISO_URL:-}" ]; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-venom.iso
 		return 1
 	fi
+elif [ -n "${SYSTEMRESCUE_ISO_URL:-}" ]; then
+	if ! systemrescue_prepare_from_iso "$SYSTEMRESCUE_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
+		return 1
+	fi
 elif [ -n "${PUPPY_ISO_URL:-}" ]; then
 	if ! puppy_prepare_from_iso "$PUPPY_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-puppy.iso
@@ -8070,7 +8397,7 @@ while true; do
 	if [ "$MAINMENU" = "install" ]; then
 		true>/tmp/nb-options
 		true>/tmp/nb-custom
-		rm -f /tmp/nb-linux /tmp/nb-initrd
+		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-initrd.*
 		installmenu || true
 		if [ -f /tmp/nb-linux ]; then break; fi
 		continue
@@ -8138,3 +8465,4 @@ Loading kernel and booting new system..." 15 80 || true
 	clear
 	kexec -e
 fi
+}
