@@ -656,6 +656,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="https://get.butterbian.org/butterbian-xfce-0.2.1-trixie-20260504.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=butterbian"
 			;;
+		devuan-daedalus-500-desktop-live)
+			DEBIAN_LIVE_LABEL="Devuan 5.0.0 Desktop Live"
+			DEBIAN_LIVE_ISO_URL="https://files.devuan.org/devuan_daedalus/desktop-live/devuan_daedalus_5.0.0_amd64_desktop-live.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=devuan"
+			;;
 		butterknife)
 			DEBIAN_LIVE_LABEL="Butterknife 0.1.11"
 			DEBIAN_LIVE_ISO_URL="https://get.butterbian.org/butterknife-0.1.11-trixie-20260504.iso"
@@ -670,6 +675,11 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="CrunchBang++ 12.0"
 			DEBIAN_LIVE_ISO_URL="https://github.com/CBPP/cbpp/releases/download/v12.0/cbpp-12.0-amd64-20230611.iso"
 			DEBIAN_LIVE_OPTIONS="username=live hostname=crunchbangplusplus"
+			;;
+		debian-live-135-standard)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 Standard"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-standard.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
 			;;
 		crowz-openbox)
 			DEBIAN_LIVE_LABEL="CROWZ 5.0.1 Openbox"
@@ -7548,6 +7558,8 @@ if [ "$DISTRO" = "debianlive" ];then
 	butterknife "Butterknife 0.1.11" \
 	bunsenlabs-carbon "BunsenLabs Carbon 1" \
 	crunchbangplusplus-120 "CrunchBang++ 12.0" \
+	devuan-daedalus-500-desktop-live "Devuan 5.0.0 Desktop Live" \
+	debian-live-135-standard "Debian Live 13.5.0 Standard" \
 	crowz-openbox "CROWZ 5.0.1 Openbox" \
 	crowz-fluxbox "CROWZ 5.0.1 Fluxbox" \
 	crowz-jwm "CROWZ 5.0.1 JWM" \

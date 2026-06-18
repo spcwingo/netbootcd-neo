@@ -203,23 +203,32 @@ if [ "$(whoami)" != "root" ]; then
 fi
 
 if [ ! -f /tmp/internet-is-up ]; then
-	if wget --no-check-certificate --tries=1 -T 5 --spider \
-		http://www.example.com >/dev/null 2>&1; then
-		echo > /tmp/internet-is-up
-	elif command -v wpa_supplicant >/dev/null 2>&1; then
-		echo "No internet connection detected."
-		echo "Use the 'wifi' option in the menu to connect to a wireless network."
-	else
-		echo "Waiting for internet connection (will keep trying indefinitely)"
-		printf '%s' "Testing example.com"
-		while ! wget --no-check-certificate --tries=1 -T 5 --spider \
-			http://www.example.com >/dev/null 2>&1; do
-			sleep 1
-			printf '.'
-		done
-		printf '\n'
-		echo > /tmp/internet-is-up
-	fi
+	NETBOOT_WAIT_SECONDS=10
+	echo "Waiting briefly for internet connection (up to ${NETBOOT_WAIT_SECONDS}s)"
+	printf '%s' "Testing example.com"
+	NETBOOT_WAIT_START=$(date +%s)
+	while :; do
+		if wget --no-check-certificate --tries=1 -T 1 --spider \
+			http://www.example.com >/dev/null 2>&1; then
+			echo > /tmp/internet-is-up
+			echo
+			echo "Internet connection detected."
+			break
+		fi
+		NETBOOT_WAIT_NOW=$(date +%s)
+		if [ $(( NETBOOT_WAIT_NOW - NETBOOT_WAIT_START )) -ge "$NETBOOT_WAIT_SECONDS" ]; then
+			echo
+			if command -v wpa_supplicant >/dev/null 2>&1; then
+				echo "No internet connection detected."
+				echo "Use the 'wifi' option in the menu to connect to a wireless network."
+			else
+				echo "Proceeding without an internet connection."
+			fi
+			break
+		fi
+		sleep 1
+		printf '.'
+	done
 fi
 
 if [ -x /tmp/nbscript.sh ]; then
@@ -239,6 +248,18 @@ patch -p0 < "${FDIR}/tc-config.diff" || {
     exit 1
 }
 cd -
+
+# Expose the live shell on serial as well as the VGA console.
+# BIOS still uses tty1, while UEFI gains a readable ttyS0 login.
+INITTAB="${NBINIT}/etc/inittab"
+if ! grep -q '^ttyS0::respawn:/sbin/getty -nl /sbin/autologin 115200 ttyS0$' "$INITTAB"; then
+    awk '
+        { print }
+        $0 == "tty1::respawn:/sbin/getty -nl /sbin/autologin 38400 tty1" {
+            print "ttyS0::respawn:/sbin/getty -nl /sbin/autologin 115200 ttyS0"
+        }
+    ' "$INITTAB" > "${INITTAB}.new" && mv "${INITTAB}.new" "$INITTAB"
+fi
 
 cp -v nbscript.sh "${NBINIT}/usr/bin"
 
@@ -371,7 +392,7 @@ insmod font
 search --no-floppy --file --set=root /boot/vmlinuz
 
 menuentry "Start NetbootCD-Neo $NBCDVER" {
-    linux  /boot/vmlinuz quiet
+    linux  /boot/vmlinuz quiet console=ttyS0,115200 console=tty0
     initrd /boot/nbinit4.gz
 }
 
