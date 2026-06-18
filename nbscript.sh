@@ -279,6 +279,11 @@ community_live_iso_setup ()
 	_community_live_tag="$1"
 
 	case "$_community_live_tag" in
+		systemrescue-1301)
+			systemrescue_iso_setup \
+				"https://osdn.net/projects/systemrescue/storage/sysresccd-13.01-amd64.iso" || return
+			echo -n "archisobasedir=sysresccd archisolabel=RESCUE1301 iomem=relaxed copytoram checksum nomodeset nomdlvm findroot break " >>/tmp/nb-options
+			;;
 		adelie-inst-beta6)
 			adelie_iso_setup || return
 			;;
@@ -4106,246 +4111,6 @@ mocaccino_prepare_from_iso ()
 	return 0
 }
 
-puppy_iso_setup ()
-{
-	PUPPY_LABEL="$1"
-	PUPPY_ISO_URL="$2"
-	PUPPY_KERNEL_PATH="$3"
-	PUPPY_INITRD_PATH="$4"
-	shift 4
-	PUPPY_SFS_PATHS="$*"
-	echo -n "pfix=ram,fsck pmedia=cd net.ifnames=0 " >>/tmp/nb-options
-}
-
-puppy_repack_initrd_with_sfs ()
-{
-	_puppy_work="/tmp/nb-puppy-work/initrd-work"
-	_puppy_repacked="/tmp/nb-puppy-work/nb-initrd.puppy"
-	_puppy_new="/tmp/nb-puppy-work/nb-initrd.new"
-
-	if ! _puppy_main_info=$(artix_find_main_initrd /tmp/nb-initrd); then
-		nb_error "Could not determine the $PUPPY_LABEL initrd compression format."
-		return 1
-	fi
-	_puppy_format="${_puppy_main_info%% *}"
-	_puppy_main_offset="${_puppy_main_info#* }"
-
-	if [ "$_puppy_format" = "zstd" ] && ! command -v zstd >/dev/null 2>&1; then
-		nb_error "$PUPPY_LABEL initrd uses zstd compression, but zstd is not available."
-		return 1
-	fi
-	if [ "$_puppy_format" = "xz" ] && ! command -v xz >/dev/null 2>&1; then
-		nb_error "$PUPPY_LABEL initrd uses xz compression, but xz is not available."
-		return 1
-	fi
-
-	rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
-	mkdir -p "$_puppy_work"
-
-	case "$_puppy_format" in
-		gzip)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | gzip -cd | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL gzip initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | zstd -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL zstd initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | xz -dc | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL xz initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( tail -c +"$(( _puppy_main_offset + 1 ))" /tmp/nb-initrd | ( cd "$_puppy_work" && cpio -idmu ) ); then
-				nb_error "Could not unpack the $PUPPY_LABEL cpio initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-	esac
-
-	for _puppy_sfs in "$@"; do
-		if [ ! -s "$_puppy_sfs" ]; then
-			nb_error "Could not find an extracted $PUPPY_LABEL SFS file: $_puppy_sfs"
-			rm -rf "$_puppy_work"
-			return 1
-		fi
-		_puppy_sfs_file="${_puppy_sfs##*/}"
-		if ! mv "$_puppy_sfs" "$_puppy_work/$_puppy_sfs_file"; then
-			nb_error "Could not embed $_puppy_sfs_file into the $PUPPY_LABEL initrd."
-			rm -rf "$_puppy_work"
-			return 1
-		fi
-	done
-
-	if [ -f "$_puppy_work/init" ] && ! grep -q 'netbootcd_puppy_tmpfs_sfs' "$_puppy_work/init"; then
-		if ! sed '/^stack_onepupdrv() {/,/^copy_onepupdrv() {/{
-/^ ONE_BASENAME="$(basename $ONE_REL_FN)"$/a\
- # netbootcd_puppy_tmpfs_sfs\
- if [ ! -s "$ONE_FN" ] && [ -f "/mnt/tmpfs/$ONE_BASENAME" ]; then\
-  ONE_FN="/mnt/tmpfs/$ONE_BASENAME"\
- fi
-}' "$_puppy_work/init" >"$_puppy_work/init.new"; then
-			nb_error "Could not patch the $PUPPY_LABEL humongous-initrd loader."
-			rm -rf "$_puppy_work" "$_puppy_work/init.new"
-			return 1
-		fi
-		mv "$_puppy_work/init.new" "$_puppy_work/init"
-		chmod 755 "$_puppy_work/init"
-	fi
-
-	case "$_puppy_format" in
-		gzip)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | gzip -1 -c >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL gzip initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		zstd)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | zstd -q -c >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL zstd initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		xz)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB -c >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL xz initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-		cpio)
-			if ! ( cd "$_puppy_work" && find . | cpio -o -H newc >"$_puppy_repacked" ); then
-				nb_error "Could not repack the $PUPPY_LABEL cpio initrd."
-				rm -rf "$_puppy_work"
-				return 1
-			fi
-			;;
-	esac
-
-	: >"$_puppy_new"
-	if [ "$_puppy_main_offset" -gt 0 ]; then
-		if ! head -c "$_puppy_main_offset" /tmp/nb-initrd >>"$_puppy_new"; then
-			nb_error "Could not preserve the $PUPPY_LABEL early initrd prefix."
-			rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
-			return 1
-		fi
-	fi
-	if ! cat "$_puppy_repacked" >>"$_puppy_new"; then
-		nb_error "Could not write the repacked $PUPPY_LABEL initrd."
-		rm -rf "$_puppy_work" "$_puppy_repacked" "$_puppy_new"
-		return 1
-	fi
-
-	mv "$_puppy_new" /tmp/nb-initrd
-	rm -rf "$_puppy_work" "$_puppy_repacked"
-	return 0
-}
-
-puppy_prepare_from_iso ()
-{
-	_puppy_iso_url="$1"
-	_puppy_work="/tmp/nb-puppy-work"
-	_puppy_iso="$_puppy_work/nb-puppy.iso"
-	_puppy_boot="$_puppy_work/boot"
-	_puppy_sfs_dir="$_puppy_work/sfs"
-
-	if ! _puppy_7z=$(artix_7z_cmd); then
-		nb_error "7zip is required to extract $PUPPY_LABEL boot files. Rebuild NetbootCD-Neo with 7zip included."
-		return 1
-	fi
-
-	if grep -q " $_puppy_work " /proc/mounts 2>/dev/null; then
-		umount "$_puppy_work" 2>/dev/null || true
-	fi
-	rm -f /tmp/nb-linux /tmp/nb-initrd
-	rm -rf "$_puppy_work" /tmp/nb-initrd.puppy /tmp/nb-initrd.new
-	mkdir -p "$_puppy_boot" "$_puppy_sfs_dir"
-	_puppy_mounted=
-	if mount -t tmpfs -o size=85%,mode=0755 tmpfs "$_puppy_work" 2>/tmp/nb-puppy-mount.log; then
-		_puppy_mounted=1
-		mkdir -p "$_puppy_boot" "$_puppy_sfs_dir"
-	fi
-
-	if ! wgetgauge "$_puppy_iso_url" "$_puppy_iso" "Downloading $PUPPY_LABEL ISO"; then
-		nb_error "Could not download $PUPPY_LABEL ISO from:\n\n$_puppy_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
-		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-		rm -rf "$_puppy_work"
-		return 1
-	fi
-
-	if ! "$_puppy_7z" e -y -o"$_puppy_boot" "$_puppy_iso" "$PUPPY_KERNEL_PATH" "$PUPPY_INITRD_PATH" >/tmp/nb-puppy-7z.log 2>&1; then
-		nb_error "Could not extract $PUPPY_LABEL boot files from the ISO.\nSee /tmp/nb-puppy-7z.log for details."
-		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-		rm -rf "$_puppy_work"
-		return 1
-	fi
-	_puppy_kernel_file="${PUPPY_KERNEL_PATH##*/}"
-	_puppy_initrd_file="${PUPPY_INITRD_PATH##*/}"
-	if [ ! -s "$_puppy_boot/$_puppy_kernel_file" ] || [ ! -s "$_puppy_boot/$_puppy_initrd_file" ]; then
-		nb_error "The $PUPPY_LABEL ISO did not contain its expected kernel and initrd."
-		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-		rm -rf "$_puppy_work"
-		return 1
-	fi
-	mv "$_puppy_boot/$_puppy_kernel_file" /tmp/nb-linux
-	mv "$_puppy_boot/$_puppy_initrd_file" /tmp/nb-initrd
-	rm -rf "$_puppy_boot"
-
-	_puppy_sfs_files=
-	for _puppy_sfs_path in $PUPPY_SFS_PATHS; do
-		if ! "$_puppy_7z" e -y -o"$_puppy_sfs_dir" "$_puppy_iso" "$_puppy_sfs_path" >>/tmp/nb-puppy-7z.log 2>&1; then
-			nb_error "Could not extract $_puppy_sfs_path from the $PUPPY_LABEL ISO.\nSee /tmp/nb-puppy-7z.log for details."
-			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-			rm -rf "$_puppy_work"
-			rm -f /tmp/nb-linux /tmp/nb-initrd
-			return 1
-		fi
-		_puppy_sfs_file="${_puppy_sfs_path##*/}"
-		if [ ! -s "$_puppy_sfs_dir/$_puppy_sfs_file" ]; then
-			nb_error "The $PUPPY_LABEL ISO did not contain $_puppy_sfs_path."
-			[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-			rm -rf "$_puppy_work"
-			rm -f /tmp/nb-linux /tmp/nb-initrd
-			return 1
-		fi
-		_puppy_sfs_files="$_puppy_sfs_files $_puppy_sfs_dir/$_puppy_sfs_file"
-	done
-
-	if [ -z "$_puppy_sfs_files" ]; then
-		nb_error "No $PUPPY_LABEL SFS files were selected for embedding."
-		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-		rm -rf "$_puppy_work"
-		rm -f /tmp/nb-linux /tmp/nb-initrd
-		return 1
-	fi
-	rm -f "$_puppy_iso"
-
-	dialog --backtitle "$TITLE" --infobox \
-		"Embedding the $PUPPY_LABEL SFS files into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
-	if ! puppy_repack_initrd_with_sfs $_puppy_sfs_files; then
-		[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-		rm -rf "$_puppy_work"
-		rm -f /tmp/nb-linux /tmp/nb-initrd
-		return 1
-	fi
-
-	rm -f "$_puppy_iso" /tmp/nb-puppy-7z.log /tmp/nb-puppy-mount.log
-	[ -n "$_puppy_mounted" ] && umount "$_puppy_work" 2>/dev/null || true
-	rm -rf "$_puppy_work"
-	return 0
-}
 
 easyos_img_setup ()
 {
@@ -6887,6 +6652,8 @@ wgetgauge ()
 	_rc=$(cat /tmp/nb-wget-rc 2>/dev/null || echo 1)
 	rm -f /tmp/nb-wget-rc
 	return "$_rc"
+}
+
 systemrescue_prepare_from_iso ()
 {
 	_systemrescue_iso_url="$1"
@@ -6937,6 +6704,11 @@ systemrescue_prepare_from_iso ()
 	rm -f "$_systemrescue_iso" /tmp/nb-systemrescue-7z.log
 	rm -rf "$_systemrescue_work"
 	return 0
+}
+
+systemrescue_iso_setup ()
+{
+	SYSTEMRESCUE_ISO_URL="$1"
 }
 
 
@@ -8465,4 +8237,3 @@ Loading kernel and booting new system..." 15 80 || true
 	clear
 	kexec -e
 fi
-}
