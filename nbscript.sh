@@ -770,6 +770,21 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_EMBED_ROOTFS_PATH="casper/filesystem.squashfs"
 			DEBIAN_LIVE_OPTIONS="quiet splash username=pureos hostname=pureos"
 			;;
+		finnix-251)
+			DEBIAN_LIVE_LABEL="Finnix 251"
+			DEBIAN_LIVE_ISO_URL="https://www.finnix.org/releases/251/finnix-251.iso"
+			;;
+		rescatux-074)
+			DEBIAN_LIVE_LABEL="Rescatux 0.74"
+			DEBIAN_LIVE_ISO_URL="https://sourceforge.net/projects/rescatux/files/rescatux-0.74/rescatux-0.74.iso/download"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=rescatux"
+			;;
+		caine-14)
+			DEBIAN_LIVE_LABEL="CAINE 14.0"
+			DEBIAN_LIVE_ISO_URL="https://www.caine-live.net/Downloads/caine14.0.iso"
+			DEBIAN_LIVE_MODE=casper-url
+			DEBIAN_LIVE_OPTIONS="username=caine hostname=caine"
+			;;
 		refracta-xfce)
 			DEBIAN_LIVE_LABEL="Refracta 13.3 Xfce"
 			DEBIAN_LIVE_ISO_URL="https://get.refracta.org/files/stable/refracta_13.3_xfce_amd64-20260501_1208.iso"
@@ -7950,6 +7965,9 @@ if [ "$DISTRO" = "rescue" ];then
 	gparted           "GParted Live 1.8.1-3" \
 	clonezilla-deb    "Clonezilla Live 3.3.1 (Debian-based)" \
 	rescuezilla       "Rescuezilla 2.6.1" \
+	finnix            "Finnix 251" \
+	rescatux          "Rescatux 0.74" \
+	caine             "CAINE 14.0" \
 	4mlinux           "4MLinux 51.0" \
 	grml-full         "Grml Full 2026.04" \
 	grml-small        "Grml Small 2026.04" 2>/tmp/nb-rescue || { rm -f /tmp/nb-rescue; return; }
@@ -7975,6 +7993,15 @@ if [ "$DISTRO" = "rescue" ];then
 		INITRDURL="$BASE/initrd"
 		SQUASH="$BASE/filesystem.squashfs"
 		echo -n "ip=dhcp boot=casper netboot=url url=$SQUASH" >>/tmp/nb-options
+	fi
+	if [ "$DISTRO" = "finnix" ];then
+		debian_live_iso_setup "finnix-251" || return
+	fi
+	if [ "$DISTRO" = "rescatux" ];then
+		debian_live_iso_setup "rescatux-074" || return
+	fi
+	if [ "$DISTRO" = "caine" ];then
+		debian_live_iso_setup "caine-14" || return
 	fi
 	if [ "$DISTRO" = "4mlinux" ];then
 		BASE="https://github.com/netbootxyz/asset-mirror/releases/download/51.0-fcaac630"
