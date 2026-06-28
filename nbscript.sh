@@ -101,7 +101,7 @@ dracut_live_iso_setup ()
 	DEBIAN_LIVE_BOOT_URL="$2"
 	DEBIAN_LIVE_MODE=embed
 	DEBIAN_LIVE_KERNEL_PATHS="images/pxeboot/vmlinuz boot/x86_64/loader/linux isolinux/vmlinuz isolinux/vmlinuz0 boot/kernel boot/vmlinuz boot/vmlinuz-*"
-	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img boot/x86_64/loader/initrd isolinux/initrd.img isolinux/initrd0.img boot/initramfs.img boot/initrd.img boot/initrd boot/initrd-*"
+	DEBIAN_LIVE_INITRD_PATHS="images/pxeboot/initrd.img boot/x86_64/loader/initrd isolinux/initrd.img isolinux/initrd0.img boot/initramfs.img boot/initrd.gz boot/initrd.img boot/initrd boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="LiveOS/squashfs.img"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
@@ -436,6 +436,11 @@ community_live_iso_setup ()
 				"boot/rootfs.xz" \
 				"rootfs.squashfs" || return
 			;;
+		openmamba-livecd-20260626)
+			dracut_live_iso_setup \
+				"openmamba LiveCD Rolling" \
+				"https://cdn.openmamba.org/pub/openmamba/media/rolling/livecd/en/openmamba-livecd-en-snapshot-20260626.x86_64.iso" || return
+			;;
 		puppy-bookwormpup64)
 			puppy_iso_setup \
 				"BookwormPup64 10.0.12" \
@@ -644,7 +649,7 @@ debian_live_iso_setup ()
 	DEBIAN_LIVE_MODE=fetch
 	DEBIAN_LIVE_OPTIONS=
 	DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
-	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.zstd live/initrd.img-* live/initrd-* boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.zstd boot/initrd.img-* boot/initrd-*"
+	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.zstd live/initrd.img-* live/initrd-* boot/initramfs-* boot/initramfs-*.img boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.zstd boot/initrd.img-* boot/initrd-*"
 	DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
 	DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
@@ -659,7 +664,8 @@ debian_live_iso_setup ()
 		devuan-daedalus-500-desktop-live)
 			DEBIAN_LIVE_LABEL="Devuan 5.0.0 Desktop Live"
 			DEBIAN_LIVE_ISO_URL="https://files.devuan.org/devuan_daedalus/desktop-live/devuan_daedalus_5.0.0_amd64_desktop-live.iso"
-			DEBIAN_LIVE_OPTIONS="username=user hostname=devuan"
+			DEBIAN_LIVE_MODE=embed
+			DEBIAN_LIVE_OPTIONS="username=devuan hostname=devuan"
 			;;
 		butterknife)
 			DEBIAN_LIVE_LABEL="Butterknife 0.1.11"
@@ -679,6 +685,46 @@ debian_live_iso_setup ()
 		debian-live-135-standard)
 			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 Standard"
 			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-standard.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-gnome)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 GNOME"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-gnome.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-kde)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 KDE"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-kde.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-cinnamon)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 Cinnamon"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-cinnamon.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-lxde)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 LXDE"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-lxde.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-lxqt)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 LXQt"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-lxqt.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-mate)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 MATE"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-mate.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-xfce)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 Xfce"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-xfce.iso"
+			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
+			;;
+		debian-live-135-debian-junior)
+			DEBIAN_LIVE_LABEL="Debian Live 13.5.0 Debian Junior"
+			DEBIAN_LIVE_ISO_URL="https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.5.0-amd64-debian-junior.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=debian"
 			;;
 		crowz-openbox)
@@ -754,6 +800,10 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_LABEL="Neptune 9.1"
 			DEBIAN_LIVE_ISO_URL="https://download.neptuneos.com/download/Neptune9-20260314.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=neptune"
+			;;
+		pardus-250-xfce)
+			DEBIAN_LIVE_LABEL="Pardus 25.0 XFCE amd64"
+			DEBIAN_LIVE_ISO_URL="https://indir.pardus.org.tr/ISO/Pardus25/Pardus-25.0-XFCE-amd64.iso"
 			;;
 		peppermint-trixie)
 			DEBIAN_LIVE_LABEL="Peppermint OS Debian 64"
@@ -7574,7 +7624,15 @@ if [ "$DISTRO" = "debianlive" ];then
 	bunsenlabs-carbon "BunsenLabs Carbon 1" \
 	crunchbangplusplus-120 "CrunchBang++ 12.0" \
 	devuan-daedalus-500-desktop-live "Devuan 5.0.0 Desktop Live" \
+	debian-live-135-gnome "Debian Live 13.5.0 GNOME" \
+	debian-live-135-kde "Debian Live 13.5.0 KDE" \
+	debian-live-135-cinnamon "Debian Live 13.5.0 Cinnamon" \
+	debian-live-135-lxde "Debian Live 13.5.0 LXDE" \
+	debian-live-135-lxqt "Debian Live 13.5.0 LXQt" \
+	debian-live-135-mate "Debian Live 13.5.0 MATE" \
+	debian-live-135-xfce "Debian Live 13.5.0 Xfce" \
 	debian-live-135-standard "Debian Live 13.5.0 Standard" \
+	debian-live-135-debian-junior "Debian Live 13.5.0 Debian Junior" \
 	crowz-openbox "CROWZ 5.0.1 Openbox" \
 	crowz-fluxbox "CROWZ 5.0.1 Fluxbox" \
 	crowz-jwm "CROWZ 5.0.1 JWM" \
@@ -7588,6 +7646,7 @@ if [ "$DISTRO" = "debianlive" ];then
 	minios-standard "MiniOS 5.1.1 Standard" \
 	nakedeb-16 "nakeDeb 1.6" \
 	neptune-91 "Neptune 9.1" \
+	pardus-250-xfce "Pardus 25.0 XFCE amd64" \
 	peppermint-trixie "Peppermint OS Debian 64" \
 	pureos-11-gnome "PureOS 11 GNOME" \
 	refracta-xfce "Refracta 13.3 Xfce" \
@@ -7636,6 +7695,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	keskos-layer-v3 "KeskOS Layer v3" \
 	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
+	openmamba-livecd-20260626 "openmamba LiveCD Rolling" \
 	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \

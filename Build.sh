@@ -26,9 +26,11 @@ PATH=$PATH:/sbin
 WORK=$(pwd)/work
 DONE=$(pwd)/done
 NBINIT=${WORK}/nbinit
+KEXEC_BUILD=
 
 cleanup() {
     rm -rf "${WORK:-}" squashfs-root opt
+    rm -rf "${KEXEC_BUILD:-}"
     rm -f "vmlinuz64-${COREVER}" "corepure64-${COREVER}.gz" \
           "kexec-tools-${KEXEC_VER}.tar.xz"
     for _pkg in ${CACHED_TCZ_PKGS:-}; do
@@ -188,12 +190,13 @@ cp "vmlinuz64-${COREVER}" "${DONE}/vmlinuz"
 chmod +w "${DONE}/vmlinuz"
 
 # --- Build nbinit4.gz from TinyCore x86_64 rootfs ---
-if [ -d "${NBINIT}" ]; then rm -r "${NBINIT}"; fi
+if [ -d "${NBINIT}" ]; then rm -rf "${NBINIT}"; fi
 mkdir "${NBINIT}"
 
 cd "${NBINIT}"
 echo "Extracting corepure64..."
 gzip -cd "${FDIR}/corepure64-${COREVER}.gz" | cpio -id
+mkdir -p "${NBINIT}/usr/bin"
 cd -
 
 cat > "${NBINIT}/usr/bin/netboot" << "EOF"
@@ -264,7 +267,7 @@ fi
 cp -v nbscript.sh "${NBINIT}/usr/bin"
 
 # x86_64 TCZ packages
-if [ -e squashfs-root ]; then rm -r squashfs-root; fi
+if [ -e squashfs-root ]; then rm -rf squashfs-root; fi
 for pkg in $BASE_TCZ_PKGS; do
     unsquashfs "${pkg}-x86_64.tcz"
     cp -a squashfs-root/* "${NBINIT}"
@@ -275,7 +278,7 @@ done
 # A 64-bit kexec binary is required for UEFI kexec handoff:
 # the i386 bzImage loader sets bzImage_support_efi_boot=0 unconditionally,
 # so it never fills boot_params.efi_info.  The x86_64 loader sets it to 1.
-KEXEC_BUILD="${WORK}/kexec-build"
+KEXEC_BUILD=$(mktemp -d /tmp/netbootcd-kexec-build.XXXXXX)
 rm -rf "${KEXEC_BUILD}"
 mkdir -p "${KEXEC_BUILD}"
 tar -C "${KEXEC_BUILD}" --strip-components=1 -xf "kexec-tools-${KEXEC_VER}.tar.xz"
@@ -455,12 +458,12 @@ cp -a "${NBINIT}" "${WORK}/nbinit-wifi"
 # install to usr/local/lib/firmware/ and will then be reachable at lib/firmware/
 # where the kernel firmware loader expects them.
 mkdir -p "${WORK}/nbinit-wifi/usr/local/lib/firmware"
-if [ -e squashfs-root ]; then rm -r squashfs-root; fi
+if [ -e squashfs-root ]; then rm -rf squashfs-root; fi
 for pkg in $WIFI_PKGS_ALL; do
     if [ -s "${pkg}-x86_64.tcz" ]; then
         unsquashfs "${pkg}-x86_64.tcz"
         tar -C squashfs-root -c . | tar -C "${WORK}/nbinit-wifi" -x
-        rm -r squashfs-root
+        rm -rf squashfs-root
     fi
 done
 
