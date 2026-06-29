@@ -441,6 +441,14 @@ community_live_iso_setup ()
 				"openmamba LiveCD Rolling" \
 				"https://cdn.openmamba.org/pub/openmamba/media/rolling/livecd/en/openmamba-livecd-en-snapshot-20260626.x86_64.iso" || return
 			;;
+		openmandriva-60-lxqt)
+			dracut_live_iso_setup \
+				"OpenMandriva Lx 6.0 LXQt" \
+				"http://downloads.sourceforge.net/project/openmandriva/release/6.0/openmandriva-6.0-lxqt.x86_64.iso" \
+				"rd.lvm=0 rootfstype=auto audit=0 quiet splash=silent" || return
+			DEBIAN_LIVE_KERNEL_PATHS="boot/vmlinuz0 boot/vmlinuz boot/vmlinuz-*"
+			DEBIAN_LIVE_INITRD_PATHS="boot/liveinitrd.img boot/initrd.img boot/initrd"
+			;;
 		puppy-bookwormpup64)
 			puppy_iso_setup \
 				"BookwormPup64 10.0.12" \
@@ -778,6 +786,12 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/loc-os/Loc-OS%2024/Loc-OS-24-current_amd64.iso"
 			DEBIAN_LIVE_OPTIONS="username=user hostname=loc-os"
 			;;
+		lilidog-trixie-260605)
+			DEBIAN_LIVE_LABEL="Lilidog Trixie 26.06.05"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/lilidog/Releases/Lilidog-Trixie-26.06.05-amd64.hybrid.iso"
+			DEBIAN_LIVE_MODE=embed
+			DEBIAN_LIVE_OPTIONS="username=user hostname=lilidog"
+			;;
 		mauna-christian)
 			DEBIAN_LIVE_LABEL="Mauna Linux 25.2 Christian Edition"
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/maunalinux/ISO/25.2/MaunaLinux-25.2-Christian-Edition-amd64.iso"
@@ -819,6 +833,12 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ROOTFS_PATHS="casper/filesystem.squashfs"
 			DEBIAN_LIVE_EMBED_ROOTFS_PATH="casper/filesystem.squashfs"
 			DEBIAN_LIVE_OPTIONS="quiet splash username=pureos hostname=pureos"
+			;;
+		q4os-aquarius-67-tde)
+			DEBIAN_LIVE_LABEL="Q4OS Aquarius 6.7 TDE"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/q4os/stable/q4os-6.7-x64-tde.r1.iso"
+			DEBIAN_LIVE_MODE=embed
+			DEBIAN_LIVE_OPTIONS="username=user hostname=q4os"
 			;;
 		finnix-251)
 			DEBIAN_LIVE_LABEL="Finnix 251"
@@ -7366,7 +7386,7 @@ debianlive "Debian-based live installers" \
 antixmx "antiX / MX Linux live installers" \
 communitylive "Community live installers" \
 pentesting "Pentesting and security live systems" \
-q4os "Q4OS Trinity 6.6" \
+q4os "Q4OS Aquarius 6.7 TDE" \
 fedora "Fedora" \
 opensuse "openSUSE" \
 mageia "Mageia" \
@@ -7640,6 +7660,7 @@ if [ "$DISTRO" = "debianlive" ];then
 	enux-533 "ENux 5.3.3 Xfce" \
 	exegnu-daedalus "Exe GNU/Linux Daedalus Trinity" \
 	kanotix-towelfire-lxde "KANOTIX Towelfire LXDE" \
+	lilidog-trixie-260605 "Lilidog Trixie 26.06.05" \
 	lmde-7-cinnamon "LMDE 7 Cinnamon" \
 	locos-24 "Loc-OS 24" \
 	mauna-christian "Mauna Linux 25.2 Christian Edition" \
@@ -7696,6 +7717,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	openmamba-livecd-20260626 "openmamba LiveCD Rolling" \
+	openmandriva-60-lxqt "OpenMandriva Lx 6.0 LXQt" \
 	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
 	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
@@ -7730,10 +7752,7 @@ if [ "$DISTRO" = "pentesting" ];then
 fi
 
 if [ "$DISTRO" = "q4os" ];then
-	BASE="https://github.com/netbootxyz/debian-squash/releases/download/6.6-5d30850e"
-	KERNELURL="$BASE/vmlinuz"
-	INITRDURL="$BASE/initrd"
-	echo -n "boot=live fetch=$BASE/filesystem.squashfs" >>/tmp/nb-options
+	debian_live_iso_setup "q4os-aquarius-67-tde" || return
 fi
 if [ "$DISTRO" = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
