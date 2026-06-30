@@ -310,6 +310,16 @@ community_live_iso_setup ()
 				"arch/x86_64/airootfs.sha512" \
 				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=10G module_blacklist=pcspkr nvme_load=yes" || return
 			;;
+		archbang-310526)
+			archiso_live_iso_setup \
+				"ArchBang 2026.05.31" \
+				"https://downloads.sourceforge.net/project/archbang/ArchBANG/archbang-310526.iso" \
+				"arch/boot/x86_64/vmlinuz-linux" \
+				"arch/boot/x86_64/initramfs-linux.img" \
+				"arch/x86_64/airootfs.sfs" \
+				"arch/x86_64/airootfs.sha512" \
+				"archisobasedir=arch arch=x86_64 copytoram=n checksum=n cow_spacesize=4G module_blacklist=pcspkr nvme_load=yes" || return
+			;;
 		bredos-20251027)
 			archiso_live_iso_setup \
 				"BredOS 2025.10.27" \
@@ -7832,6 +7842,7 @@ if [ "$DISTRO" = "communitylive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 21 \
 	acreetionos-cinnamon-10 "AcreetionOS 1.0 Cinnamon" \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
+	archbang-310526 "ArchBang 2026.05.31" \
 	bredos-20251027 "BredOS 2025.10.27" \
 	berry-142 "Berry Linux 1.42" \
 	cachyos-desktop-260426 "CachyOS Desktop 260426" \
