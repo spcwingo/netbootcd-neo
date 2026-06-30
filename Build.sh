@@ -264,6 +264,29 @@ if ! grep -q '^ttyS0::respawn:/sbin/getty -nl /sbin/autologin 115200 ttyS0$' "$I
     ' "$INITTAB" > "${INITTAB}.new" && mv "${INITTAB}.new" "$INITTAB"
 fi
 
+# Per-controlling-tty one-shot autologin.
+# The stock /sbin/autologin guards autologin with a single shared flag
+# (/var/log/autologin). With getty respawning /sbin/autologin on both tty1
+# (VGA) and ttyS0 (serial), whichever fires first consumes that flag and the
+# loser falls through to a plain "box login:" prompt -- so the serial console
+# could steal the VGA console's autologin and drop the user at a password
+# prompt instead of the NetbootCD menu. Key the one-shot per tty so tty1 and
+# ttyS0 each autologin exactly once, independently.
+cat > "${NBINIT}/sbin/autologin" << "EOF"
+#!/bin/busybox ash
+_tty=$(tty 2>/dev/null)
+_tty=${_tty#/dev/}
+[ -n "$_tty" ] || _tty=tty1
+_flag="/var/log/autologin.$_tty"
+if [ -f "$_flag" ]; then
+	exec /sbin/getty 38400 "$_tty"
+else
+	touch "$_flag"
+	exec login -f root
+fi
+EOF
+chmod 755 "${NBINIT}/sbin/autologin"
+
 cp -v nbscript.sh "${NBINIT}/usr/bin"
 
 # x86_64 TCZ packages

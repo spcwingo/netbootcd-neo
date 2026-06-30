@@ -109,6 +109,19 @@ dracut_live_iso_setup ()
 	echo -n "root=live:/LiveOS/squashfs.img ro rd.live.image rd.live.overlay.overlayfs=1 rd.luks=0 rd.md=0 rd.dm=0 $3 " >>/tmp/nb-options
 }
 
+# OpenMandriva's liveiso dracut module only accepts root=live:LABEL=/UUID= (a
+# block device) and ignores root=live:/path, so the generic dracut embed mode
+# cannot boot it. Instead the whole ISO is embedded in the liveinitrd and a
+# pre-udev hook loop-mounts it (see omv_repack_initrd_with_iso) so udev creates
+# /dev/disk/by-label/<volid>, which liveiso then finds and mounts.
+omv_iso_setup ()
+{
+	OMV_LABEL="$1"
+	OMV_ISO_URL="$2"
+	OMV_VOLID="$3"
+	echo -n "root=live:LABEL=$OMV_VOLID rd.live.image rootfstype=auto ro rd.luks=0 rd.lvm=0 rd.md=0 rd.dm=0 audit=0 quiet " >>/tmp/nb-options
+}
+
 gobolinux_iso_setup ()
 {
 	DEBIAN_LIVE_LABEL="GoboLinux 017.01"
@@ -442,12 +455,10 @@ community_live_iso_setup ()
 				"https://cdn.openmamba.org/pub/openmamba/media/rolling/livecd/en/openmamba-livecd-en-snapshot-20260626.x86_64.iso" || return
 			;;
 		openmandriva-60-lxqt)
-			dracut_live_iso_setup \
+			omv_iso_setup \
 				"OpenMandriva Lx 6.0 LXQt" \
 				"http://downloads.sourceforge.net/project/openmandriva/release/6.0/openmandriva-6.0-lxqt.x86_64.iso" \
-				"rd.lvm=0 rootfstype=auto audit=0 quiet splash=silent" || return
-			DEBIAN_LIVE_KERNEL_PATHS="boot/vmlinuz0 boot/vmlinuz boot/vmlinuz-*"
-			DEBIAN_LIVE_INITRD_PATHS="boot/liveinitrd.img boot/initrd.img boot/initrd"
+				"OpenMandrivaLx_6.0" || return
 			;;
 		puppy-bookwormpup64)
 			puppy_iso_setup \
@@ -2334,6 +2345,124 @@ chimera_prepare_from_iso ()
 	fi
 
 	rm -f /tmp/nb-chimera-7z.log /tmp/nb-chimera-mount.log /tmp/nb-chimera-cpio.log
+	return 0
+}
+
+omv_repack_initrd_with_iso ()
+{
+	_omv_iso="$1"
+	_omv_parent="${_omv_iso%/*}"
+	_omv_tree="$_omv_parent/initrd-work"
+	_omv_repacked="$_omv_parent/nb-initrd.repacked"
+	_omv_final="$_omv_parent/nb-initrd"
+	_omv_hook="$_omv_tree/usr/lib/dracut/hooks/pre-udev/00-omv-netboot-loop.sh"
+
+	if ! command -v zstd >/dev/null 2>&1; then
+		nb_error "$OMV_LABEL liveinitrd uses zstd compression, but zstd is not available."
+		return 1
+	fi
+
+	rm -rf "$_omv_tree" "$_omv_repacked" "$_omv_final"
+	mkdir -p "$_omv_tree"
+	if ! ( zstd -dc /tmp/nb-initrd | ( cd "$_omv_tree" && cpio -idmu ) ) 2>/tmp/nb-omv-cpio.log; then
+		nb_error "Could not unpack the $OMV_LABEL liveinitrd.\nSee /tmp/nb-omv-cpio.log for details."
+		rm -rf "$_omv_tree"
+		return 1
+	fi
+
+	# Confirm this really is the OpenMandriva liveiso initramfs before patching.
+	if [ ! -e "$_omv_tree/usr/sbin/liveiso-root" ]; then
+		nb_error "Could not find the $OMV_LABEL liveiso mount handler in the initramfs."
+		rm -rf "$_omv_tree"
+		return 1
+	fi
+
+	# Pre-udev hook (priority 00, before 30-liveiso-genrules) loop-mounts the
+	# embedded ISO so udev creates /dev/disk/by-label/<volid> for liveiso.
+	mkdir -p "$_omv_tree/usr/lib/dracut/hooks/pre-udev"
+	cat > "$_omv_hook" << 'HOOK'
+#!/bin/sh
+[ -e /omv-netboot.iso ] && losetup -fr /omv-netboot.iso
+HOOK
+	chmod 755 "$_omv_hook"
+
+	# Embed the whole ISO so the loop device above carries the live medium.
+	if ! mv "$_omv_iso" "$_omv_tree/omv-netboot.iso"; then
+		nb_error "Could not embed the $OMV_LABEL ISO into the initramfs."
+		rm -rf "$_omv_tree"
+		return 1
+	fi
+
+	if ! ( cd "$_omv_tree" && find . | cpio -o -H newc | zstd -q -c >"$_omv_repacked" ); then
+		nb_error "Could not repack the $OMV_LABEL zstd initramfs."
+		rm -rf "$_omv_tree"
+		return 1
+	fi
+	rm -rf "$_omv_tree"
+	mv "$_omv_repacked" "$_omv_final"
+	rm -f /tmp/nb-initrd
+	ln -s "$_omv_final" /tmp/nb-initrd
+	return 0
+}
+
+omv_prepare_from_iso ()
+{
+	_omv_iso_url="$1"
+	_omv_work="/tmp/nb-omv-work"
+	_omv_iso="$_omv_work/nb-omv.iso"
+	_omv_boot="$_omv_work/boot"
+
+	if ! _omv_7z=$(artix_7z_cmd); then
+		nb_error "7zip is required to extract $OMV_LABEL ISO boot files. Rebuild NetbootCD-Neo with 7zip included."
+		return 1
+	fi
+
+	if grep -q " $_omv_work " /proc/mounts 2>/dev/null; then
+		umount "$_omv_work" 2>/dev/null || true
+	fi
+	rm -f /tmp/nb-linux /tmp/nb-initrd
+	rm -rf "$_omv_work"
+	mkdir -p "$_omv_boot"
+	_omv_mounted=
+	if mount -t tmpfs -o size=90%,mode=0755 tmpfs "$_omv_work" 2>/tmp/nb-omv-mount.log; then
+		_omv_mounted=1
+		mkdir -p "$_omv_boot"
+	fi
+
+	if ! wgetgauge "$_omv_iso_url" "$_omv_iso" "Downloading $OMV_LABEL ISO"; then
+		nb_error "Could not download $OMV_LABEL ISO from:\n\n$_omv_iso_url\n\nThis entry needs enough RAM to hold the ISO and the repacked initrd."
+		[ -n "$_omv_mounted" ] && umount "$_omv_work" 2>/dev/null || true
+		rm -rf "$_omv_work"
+		return 1
+	fi
+
+	if ! "$_omv_7z" e -y -o"$_omv_boot" "$_omv_iso" "boot/vmlinuz0" "boot/liveinitrd.img" >/tmp/nb-omv-7z.log 2>&1; then
+		nb_error "Could not extract $OMV_LABEL boot files from the ISO.\nSee /tmp/nb-omv-7z.log for details."
+		[ -n "$_omv_mounted" ] && umount "$_omv_work" 2>/dev/null || true
+		rm -rf "$_omv_work"
+		return 1
+	fi
+	if [ ! -s "$_omv_boot/vmlinuz0" ] || [ ! -s "$_omv_boot/liveinitrd.img" ]; then
+		nb_error "The $OMV_LABEL ISO did not contain its expected kernel and liveinitrd."
+		[ -n "$_omv_mounted" ] && umount "$_omv_work" 2>/dev/null || true
+		rm -rf "$_omv_work"
+		return 1
+	fi
+
+	mv "$_omv_boot/vmlinuz0" /tmp/nb-linux
+	mv "$_omv_boot/liveinitrd.img" /tmp/nb-initrd
+	rm -rf "$_omv_boot"
+
+	dialog --backtitle "$TITLE" --infobox \
+		"Embedding the $OMV_LABEL ISO into the initrd.\n\nThis can take a while for large ISOs." 7 70 || true
+	if ! omv_repack_initrd_with_iso "$_omv_iso"; then
+		[ -n "$_omv_mounted" ] && umount "$_omv_work" 2>/dev/null || true
+		rm -rf "$_omv_work"
+		rm -f /tmp/nb-linux /tmp/nb-initrd
+		return 1
+	fi
+
+	rm -f /tmp/nb-omv-7z.log /tmp/nb-omv-mount.log /tmp/nb-omv-cpio.log
 	return 0
 }
 
@@ -7290,6 +7419,9 @@ NEMESIS_ISO_URL=
 NEMESIS_LABEL=
 NEMESIS_KERNEL_PATH=
 NEMESIS_INITRD_PATH=
+OMV_ISO_URL=
+OMV_LABEL=
+OMV_VOLID=
 CHIMERA_ISO_URL=
 CHIMERA_LABEL=
 CHIMERA_KERNEL_PATH=
@@ -8166,6 +8298,11 @@ elif [ -n "${PORTEUS_ISO_URL:-}" ]; then
 elif [ -n "${NEMESIS_ISO_URL:-}" ]; then
 	if ! nemesis_prepare_from_iso "$NEMESIS_ISO_URL"; then
 		rm -f /tmp/nb-linux /tmp/nb-initrd /tmp/nb-nemesis.iso
+		return 1
+	fi
+elif [ -n "${OMV_ISO_URL:-}" ]; then
+	if ! omv_prepare_from_iso "$OMV_ISO_URL"; then
+		rm -f /tmp/nb-linux /tmp/nb-initrd
 		return 1
 	fi
 elif [ -n "${CHIMERA_ISO_URL:-}" ]; then
