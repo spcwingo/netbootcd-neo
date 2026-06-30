@@ -28,7 +28,7 @@ PATH=/usr/local/sbin:/usr/local/bin:$PATH
 export PATH
 export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-TITLE="NetbootCD-Neo Script 17.0.3 - June 10, 2026"
+TITLE="NetbootCD-Neo Script 17.0.4 - June 10, 2026"
 
 EFIMODE=0
 [ -d /sys/firmware/efi ] && EFIMODE=1
@@ -435,6 +435,54 @@ community_live_iso_setup ()
 				"PikaOS-Nest-COSMIC-4.0-amd64-v3-26.04.04-1.iso" \
 				"PSC 26.04.04 1" || return
 			;;
+		vendefoulwolf-excalibur-bspwm)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur Bspwm" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/Bspwm/VendefoulWolf-Bspwm-20260531_1352.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-kde-plasma)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur KDE Plasma" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/KDE%20Plasma/Vendefoul_Excalibur_Plasma_Discover_Xlibre_OpenRC_amd64-20260124_1801.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-katana)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur KatanaDE" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/KatanaDE/vendefoul-excalibur-katana-xlibre-openrc_amd64-20260521_2145.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-xfce4)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur Xfce4" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/Xfce4/Vendefoul-Excalibur-Xfce4_amd64_2026-02-25_2040.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-cinnamon)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur Cinnamon" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/Cinnamon/Vendefoul-Excalibur-Cinnamon_amd64_2026-02-25_2026.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-budgie)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur Budgie" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/Budgie/Vendefoul_Excalibur_Budgie_Xlibre_OpenRC_amd64-20260124_2355.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-lxqt)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur LXQt" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/LXQT/vendefoul-excalibur-lxqt-xlibre-openrc_amd64-20260120_1247.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
+		vendefoulwolf-excalibur-icewm)
+			debian_live_simple_iso_setup \
+				"Vendefoul Wolf Excalibur IceWM" \
+				"http://downloads.sourceforge.net/project/vendefoul-wolf-linux/Vendefoul%20Wolf%20Excalibur/IceWM/vendefoul-excalibur-icewm-xlibre-openrc_amd64-20260119_2149.iso" \
+				"username=user hostname=vendefoulwolf" || return
+			;;
 		prismlinux-20260505)
 			archiso_live_iso_setup \
 				"PrismLinux 2026.05.05" \
@@ -677,6 +725,25 @@ downloadandrun ()
 	rm -f "$_nbscript_new"
 	nb_error "Downloading the newest NetbootCD-Neo script was not successful.\n\nURL:\n$_nbscript_url"
 	return "$_nbscript_rc"
+}
+
+# Inline Debian/Devuan live-boot setup (label, ISO URL, extra live-config opts)
+# for community-menu entries. Unlike debian_live_iso_setup (which looks an entry
+# up by tag), this takes the ISO details directly. Embeds the squashfs into the
+# initrd so there is no network fetch at boot.
+debian_live_simple_iso_setup ()
+{
+	DEBIAN_LIVE_LABEL="$1"
+	DEBIAN_LIVE_ISO_URL="$2"
+	DEBIAN_LIVE_BOOT_URL="$2"
+	DEBIAN_LIVE_MODE=embed
+	DEBIAN_LIVE_KERNEL_PATHS="live/vmlinuz live/vmlinuz-* boot/vmlinuz boot/vmlinuz-*"
+	DEBIAN_LIVE_INITRD_PATHS="live/initrd.img live/initrd live/initrd.gz live/initrd.lz live/initrd.xz live/initrd.zst live/initrd.zstd live/initrd.img-* live/initrd-* boot/initramfs-* boot/initramfs-*.img boot/initrd.img boot/initrd boot/initrd.gz boot/initrd.lz boot/initrd.xz boot/initrd.zst boot/initrd.zstd boot/initrd.img-* boot/initrd-*"
+	DEBIAN_LIVE_ROOTFS_PATHS="live/filesystem.squashfs live/filesystem.squashfs-* live/*.squashfs"
+	DEBIAN_LIVE_EMBED_ROOTFS_PATH="live/filesystem.squashfs"
+	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
+	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
+	echo -n "boot=live config components live-media=/ noeject noprompt $3 " >>/tmp/nb-options
 }
 
 debian_live_iso_setup ()
@@ -7928,7 +7995,7 @@ if [ "$DISTRO" = "debianlive" ];then
 fi
 
 if [ "$DISTRO" = "communitylive" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 21 \
+	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 28 \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
 	archbang-310526 "ArchBang 2026.05.31" \
 	bredos-20251027 "BredOS 2025.10.27" \
@@ -7953,6 +8020,14 @@ if [ "$DISTRO" = "communitylive" ];then
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	puppy-trixiepup64-legacy-114 "TrixiePup64 Legacy 11.4" \
 	solus-xfce "Solus Xfce 2026-04-18" \
+	vendefoulwolf-excalibur-bspwm "Vendefoul Wolf Excalibur Bspwm" \
+	vendefoulwolf-excalibur-katana "Vendefoul Wolf Excalibur KatanaDE" \
+	vendefoulwolf-excalibur-xfce4 "Vendefoul Wolf Excalibur Xfce4" \
+	vendefoulwolf-excalibur-cinnamon "Vendefoul Wolf Excalibur Cinnamon" \
+	vendefoulwolf-excalibur-budgie "Vendefoul Wolf Excalibur Budgie" \
+	vendefoulwolf-excalibur-lxqt "Vendefoul Wolf Excalibur LXQt" \
+	vendefoulwolf-excalibur-icewm "Vendefoul Wolf Excalibur IceWM" \
+	vendefoulwolf-excalibur-kde-plasma "Vendefoul Wolf Excalibur KDE Plasma" \
 	venom-base-sysv-20260320 "Venom Linux Base SysV 2026-03-20" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
