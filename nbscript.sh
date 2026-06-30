@@ -83,15 +83,25 @@ ubuntu_live_server ()
 
 ubuntu_casper_iso_setup ()
 {
+	# $5 = "embed" boots the casper squashfs embedded in the initrd (no network
+	# fetch) for distros whose own initramfs can't do HTTPS; default is
+	# casper-url netboot.
 	DEBIAN_LIVE_LABEL="$1"
 	DEBIAN_LIVE_ISO_URL="$2"
 	DEBIAN_LIVE_BOOT_URL="${4:-$2}"
-	DEBIAN_LIVE_MODE=casper-url
 	DEBIAN_LIVE_KERNEL_PATHS="casper/vmlinuz casper/vmlinuz.efi live/vmlinuz boot/vmlinuz boot/vmlinuz-*"
 	DEBIAN_LIVE_INITRD_PATHS="casper/initrd casper/initrd.lz casper/initrd.img casper/initrd.gz casper/initrd.zst casper/initrd.zstd live/initrd live/initrd.lz live/initrd.img live/initrd.gz live/initrd.zst live/initrd.zstd boot/initrd boot/initrd.lz boot/initrd.img boot/initrd.gz boot/initrd.zst boot/initrd.zstd"
 	DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH=
 	DEBIAN_LIVE_EXTRA_ROOTFS_PATHS=
-	echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
+	if [ "$5" = "embed" ]; then
+		DEBIAN_LIVE_MODE=casper-embed
+		DEBIAN_LIVE_ROOTFS_PATHS="casper/filesystem.squashfs"
+		DEBIAN_LIVE_EMBED_ROOTFS_PATH="casper/filesystem.squashfs"
+		echo -n "boot=casper live-media=/ noeject noprompt $3 " >>/tmp/nb-options
+	else
+		DEBIAN_LIVE_MODE=casper-url
+		echo -n "ip=dhcp boot=casper netboot=url url=$DEBIAN_LIVE_BOOT_URL iso-url=$DEBIAN_LIVE_BOOT_URL noprompt noeject $3 " >>/tmp/nb-options
+	fi
 }
 
 dracut_live_iso_setup ()
@@ -901,6 +911,12 @@ debian_live_iso_setup ()
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/sparkylinux/xfce/sparkylinux-8.3.1-x86_64-xfce.iso"
 			DEBIAN_LIVE_OPTIONS="username=live hostname=sparky"
 			;;
+		spirallinux-xfce-12)
+			DEBIAN_LIVE_LABEL="SpiralLinux 12 Xfce"
+			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/spirallinux/12.231120/SpiralLinux_XFCE_12.231120_x86-64.iso"
+			DEBIAN_LIVE_MODE=embed
+			DEBIAN_LIVE_OPTIONS="username=user hostname=spirallinux"
+			;;
 		synex-icewm)
 			DEBIAN_LIVE_LABEL="Synex 13 IceWM"
 			DEBIAN_LIVE_ISO_URL="http://downloads.sourceforge.net/project/synex/Stable/ICEWM/synex-icewm-13-u8-amd64.hybrid.iso"
@@ -1025,6 +1041,60 @@ debian_live_repack_initrd_with_rootfs ()
 		nb_error "$DEBIAN_LIVE_LABEL initramfs uses xz compression, but xz is not available."
 		return 1
 	fi
+
+	if [ "$_debian_live_format" = "cpio" ]; then
+		# Uncompressed concatenated-CPIO initrd (e.g. Ubuntu 24.04 casper:
+		# microcode + main, both uncompressed). Unpacking with cpio stops at the
+		# first TRAILER and drops the later sections (losing /init), so instead
+		# build a CPIO holding only the live filesystem and APPEND it -- the
+		# kernel processes concatenated CPIO archives in order.
+		rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new" "$_debian_live_final"
+		mkdir -p "$_debian_live_work"
+		_debian_live_embed_rootfs="$_debian_live_work/$DEBIAN_LIVE_EMBED_ROOTFS_PATH"
+		mkdir -p "${_debian_live_embed_rootfs%/*}"
+		if ! mv "$_debian_live_rootfs" "$_debian_live_embed_rootfs"; then
+			nb_error "Could not stage the $DEBIAN_LIVE_LABEL live filesystem."
+			rm -rf "$_debian_live_work"
+			return 1
+		fi
+		if [ -n "${DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH:-}" ]; then
+			_debian_live_alias="$_debian_live_work/$DEBIAN_LIVE_EMBED_ROOTFS_ALIAS_PATH"
+			mkdir -p "${_debian_live_alias%/*}"
+			ln -s "../$DEBIAN_LIVE_EMBED_ROOTFS_PATH" "$_debian_live_alias" || true
+		fi
+		for _debian_live_extra_path in ${DEBIAN_LIVE_EXTRA_ROOTFS_PATHS:-}; do
+			_debian_live_extra_dest="$_debian_live_work/$_debian_live_extra_path"
+			mkdir -p "${_debian_live_extra_dest%/*}"
+			mv "$_debian_live_parent/$_debian_live_extra_path" "$_debian_live_extra_dest" || true
+		done
+		if ! ( cd "$_debian_live_work" && find . | cpio -o -H newc >"$_debian_live_repacked" ); then
+			nb_error "Could not build the $DEBIAN_LIVE_LABEL live filesystem archive."
+			rm -rf "$_debian_live_work"
+			return 1
+		fi
+		rm -rf "$_debian_live_work"
+		: >"$_debian_live_new"
+		if ! cat /tmp/nb-initrd >>"$_debian_live_new"; then
+			nb_error "Could not copy the $DEBIAN_LIVE_LABEL initramfs."
+			rm -f "$_debian_live_repacked" "$_debian_live_new"
+			return 1
+		fi
+		_debian_live_pad=$(( (4 - ($(artix_file_size "$_debian_live_new") % 4)) % 4 ))
+		if [ "$_debian_live_pad" -gt 0 ]; then
+			dd if=/dev/zero bs=1 count="$_debian_live_pad" >>"$_debian_live_new" 2>/dev/null
+		fi
+		if ! cat "$_debian_live_repacked" >>"$_debian_live_new"; then
+			nb_error "Could not append the $DEBIAN_LIVE_LABEL live filesystem to the initramfs."
+			rm -f "$_debian_live_repacked" "$_debian_live_new"
+			return 1
+		fi
+		mv "$_debian_live_new" "$_debian_live_final"
+		rm -f "$_debian_live_repacked"
+		rm -f /tmp/nb-initrd
+		ln -s "$_debian_live_final" /tmp/nb-initrd
+		return 0
+	fi
+
 
 	rm -rf "$_debian_live_work" "$_debian_live_repacked" "$_debian_live_new" "$_debian_live_final"
 	mkdir -p "$_debian_live_work"
@@ -7525,23 +7595,26 @@ ubuntuflavor "Ubuntu flavors and derivatives" \
 debian "Debian GNU/Linux" \
 devuan "Devuan GNU/Linux" \
 debianlive "Debian-based live installers" \
-antixmx "antiX / MX Linux live installers" \
 communitylive "Community live installers" \
 pentesting "Pentesting and security live systems" \
-q4os "Q4OS Aquarius 6.7 TDE" \
-fedora "Fedora" \
-opensuse "openSUSE" \
-mageia "Mageia" \
-rhel "RHEL-compatible installers" \
-arch "Arch Linux" \
-artix "Artix Linux" \
+rpmbased "Red Hat / RPM-based installers" \
+archbased "Arch Linux and derivatives" \
 void "Void Linux" \
-altlinux "ALT Linux" \
 guix "GNU Guix System" \
-slackware "Slackware" \
+slackware "Slackware and derivatives" \
 rescue "Rescue and utility tools" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
 DISTRO=$(cat /tmp/nb-distro)
 rm /tmp/nb-distro
+if [ "$DISTRO" = "rpmbased" ];then
+	dialog --backtitle "$TITLE" --menu "Choose a Red Hat / RPM-based installer:" 14 78 5 \
+	fedora "Fedora" \
+	opensuse "openSUSE" \
+	mageia "Mageia" \
+	rhel "RHEL-compatible installers" \
+	altlinux "ALT Linux" 2>/tmp/nb-distro || { rm -f /tmp/nb-distro; return; }
+	DISTRO=$(cat /tmp/nb-distro)
+	rm /tmp/nb-distro
+fi
 if [ "$DISTRO" = "rhel" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a RHEL-compatible installer family:" 18 78 8 \
 	rhel-type-10 "AlmaLinux 10 / CentOS 10-Stream / Rocky Linux 10" \
@@ -7617,8 +7690,9 @@ if [ "$DISTRO" = "ubuntuflavor" ];then
 		mate-24.04 "Ubuntu MATE 24.04.4 LTS" \
 		bodhi-7.0 "Bodhi Linux 7.0.0" \
 		funos-24.04 "FunOS 24.04.4 LTS Calamares" \
+		anduinos-2.0.0 "AnduinOS 2.0.0" \
 		kde-neon-user "KDE neon User Edition" \
-		linuxlite-7.8 "Linux Lite 7.8" \
+		linuxlite-8.0 "Linux Lite 8.0" \
 		mint-22.3-cinnamon "Linux Mint 22.3 Cinnamon" \
 		mint-22.3-mate "Linux Mint 22.3 MATE" \
 		mint-22.3-xfce "Linux Mint 22.3 Xfce" \
@@ -7670,12 +7744,25 @@ if [ "$DISTRO" = "ubuntuflavor" ];then
 			"username=neon hostname=neon" || return
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
-	elif [ "$VERSION" = "linuxlite-7.8" ]; then
+	elif [ "$VERSION" = "anduinos-2.0.0" ]; then
+		# embed mode: AnduinOS's own initramfs can't do HTTPS (busybox wget has
+		# no openssl), so casper-url netboot fails on its cf.anduinos.com URL.
+		# Embed the squashfs instead -- TinyCore downloads over HTTPS and
+		# AnduinOS boots with no network fetch.
 		ubuntu_casper_iso_setup \
-			"Linux Lite 7.8" \
-			"http://master.dl.sourceforge.net/project/linux-lite/7.8/linux-lite-7.8-64bit.iso?viasf=1" \
+			"AnduinOS 2.0.0" \
+			"https://cf.anduinos.com/AnduinOS-2.0.0.iso" \
+			"username=anduinos hostname=anduinos" \
+			"https://cf.anduinos.com/AnduinOS-2.0.0.iso" \
+			"embed" || return
+		UBUNTU_LIVE_CUSTOM=1
+		ISODEFAULT=custom
+	elif [ "$VERSION" = "linuxlite-8.0" ]; then
+		ubuntu_casper_iso_setup \
+			"Linux Lite 8.0" \
+			"http://master.dl.sourceforge.net/project/linux-lite/8.0/linux-lite-8.0-64bit.iso?viasf=1" \
 			"username=linuxlite hostname=linuxlite" \
-			"http://downloads.sourceforge.net/project/linux-lite/7.8/linux-lite-7.8-64bit.iso" || return
+			"http://downloads.sourceforge.net/project/linux-lite/8.0/linux-lite-8.0-64bit.iso" || return
 		UBUNTU_LIVE_CUSTOM=1
 		ISODEFAULT=custom
 	elif [ "$VERSION" = "mint-22.3-cinnamon" ]; then
@@ -7817,68 +7904,54 @@ if [ "$DISTRO" = "debianlive" ];then
 	solydx-13 "SolydX 13" \
 	sparky-lxqt-83 "SparkyLinux 8.3 LXQt" \
 	sparky-xfce-831 "SparkyLinux 8.3.1 Xfce" \
+	spirallinux-xfce-12 "SpiralLinux 12 Xfce" \
 	synex-icewm "Synex 13 IceWM" \
 	synex-lxde "Synex 13 LXDE" \
 	synex-xfce "Synex 13 Xfce" \
 	voyager-debian-133 "Voyager 13.3 Debian" \
-	wattos-r13 "wattOS R13" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
-	VERSION=$(cat /tmp/nb-version)
-	rm /tmp/nb-version
-	debian_live_iso_setup "$VERSION" || return
-fi
-
-if [ "$DISTRO" = "antixmx" ];then
-	dialog --backtitle "$TITLE" --menu "Choose an antiX/MX live installer to boot:" 18 75 8 \
+	wattos-r13 "wattOS R13" \
+	q4os-aquarius-67-tde "Q4OS Aquarius 6.7 TDE" \
 	antix-26-core "antiX 26 Core" \
 	avlinux-mxe-251 "AV Linux MXE 25.1" \
 	mx-25.1-xfce "MX Linux 25.1 Xfce" \
 	mx-25.1-xfce-ahs "MX Linux 25.1 Xfce AHS" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
 	rm /tmp/nb-version
-	antix_mx_iso_setup "$VERSION" || return
+	case "$VERSION" in
+		antix-*|avlinux-*|mx-*)
+			antix_mx_iso_setup "$VERSION" || return
+			;;
+		*)
+			debian_live_iso_setup "$VERSION" || return
+			;;
+	esac
 fi
 
 if [ "$DISTRO" = "communitylive" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a community live installer to boot:" 25 78 21 \
-	acreetionos-cinnamon-10 "AcreetionOS 1.0 Cinnamon" \
 	adelie-inst-beta6 "Adelie Linux 1.0-beta6 Installer" \
 	archbang-310526 "ArchBang 2026.05.31" \
 	bredos-20251027 "BredOS 2025.10.27" \
 	berry-142 "Berry Linux 1.42" \
-	cachyos-desktop-260426 "CachyOS Desktop 260426" \
 	chimera-base "Chimera Linux Base 2025-12-20" \
 	coyote-installer-40192 "Coyote Linux 4.0.192 Technology Preview (router)" \
 	daphile-2505 "Daphile 25.05 x86_64 (music server)" \
-	ditana-09-beta "Ditana GNU/Linux 0.9 Beta" \
-	endeavouros-titan-neo-20260427 "EndeavourOS Titan Neo 2026.04.27" \
 	easyos-excalibur "EasyOS Excalibur 7.3.8" \
 	fatdog64-903 "Fatdog64 903" \
-	garuda-kde-lite-latest "Garuda KDE Lite latest" \
 	gobolinux-01701 "GoboLinux 017.01" \
-	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
-	keskos-layer-v3 "KeskOS Layer v3" \
 	libreelec-generic "LibreELEC Generic x86_64 12.2.1" \
 	mocaccino-kde-20260505 "MocaccinoOS KDE 0.20260505" \
 	openmamba-livecd-20260626 "openmamba LiveCD Rolling" \
 	openmandriva-60-lxqt "OpenMandriva Lx 6.0 LXQt" \
 	nemesis-lxde-2510 "Nemesis Linux 25.10 LXDE" \
 	nutyx-xfce-260403 "NuTyX 26.04.3 Xfce" \
-	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
-	parabola-cli-202204 "Parabola GNU/Linux-libre 2022.04 CLI netinstall" \
 	pikaos-gnome "PikaOS 4.0 GNOME" \
 	pikaos-kde "PikaOS 4.0 KDE" \
 	pikaos-hyprland "PikaOS 4.0 Hyprland" \
 	pikaos-niri "PikaOS 4.0 Niri" \
 	pikaos-cosmic "PikaOS 4.0 COSMIC" \
-	prismlinux-20260505 "PrismLinux 2026.05.05" \
-	rebornos-20260122 "RebornOS 2026.01.22" \
-	porteus-xfce-501 "Porteus 5.01 Xfce" \
-	porteux-lxde "PorteuX 2.4 LXDE" \
 	puppy-bookwormpup64 "BookwormPup64 10.0.12" \
 	puppy-trixiepup64-legacy-114 "TrixiePup64 Legacy 11.4" \
-	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
-	slackel-openbox-80 "Slackel 8.0 Openbox" \
-	sdesk-quartz-202510 "SDesk Quartz 2025.10" \
 	solus-xfce "Solus Xfce 2026-04-18" \
 	venom-base-sysv-20260320 "Venom Linux Base SysV 2026-03-20" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	VERSION=$(cat /tmp/nb-version)
@@ -7894,9 +7967,6 @@ if [ "$DISTRO" = "pentesting" ];then
 	pentesting_iso_setup "$VERSION" || return
 fi
 
-if [ "$DISTRO" = "q4os" ];then
-	debian_live_iso_setup "q4os-aquarius-67-tde" || return
-fi
 if [ "$DISTRO" = "fedora" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	releases/44/Server "Fedora Server 44" \
@@ -8105,6 +8175,34 @@ if [ "$DISTRO" = "openeuler" ];then
 	echo -n "inst.repo=$SERVER" >>/tmp/nb-options
 	rm /tmp/nb-server
 fi
+if [ "$DISTRO" = "archbased" ];then
+	dialog --backtitle "$TITLE" --menu "Choose an Arch Linux or Arch-based system:" 25 78 16 \
+	arch "Arch Linux" \
+	artix "Artix Linux" \
+	acreetionos-cinnamon-10 "AcreetionOS 1.0 Cinnamon" \
+	bredos-20251027 "BredOS 2025.10.27" \
+	cachyos-desktop-260426 "CachyOS Desktop 260426" \
+	ditana-09-beta "Ditana GNU/Linux 0.9 Beta" \
+	endeavouros-titan-neo-20260427 "EndeavourOS Titan Neo 2026.04.27" \
+	garuda-kde-lite-latest "Garuda KDE Lite latest" \
+	hyperbola-milky-way-044 "Hyperbola GNU/Linux-libre Milky Way 0.4.4" \
+	keskos-layer-v3 "KeskOS Layer v3" \
+	obarun-minimal-20260430 "Obarun Minimal 2026.04.30" \
+	parabola-cli-202204 "Parabola GNU/Linux-libre 2022.04 CLI netinstall" \
+	prismlinux-20260505 "PrismLinux 2026.05.05" \
+	rebornos-20260122 "RebornOS 2026.01.22" \
+	sdesk-quartz-202510 "SDesk Quartz 2025.10" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
+	VERSION=$(cat /tmp/nb-version)
+	rm /tmp/nb-version
+	case "$VERSION" in
+		arch|artix)
+			DISTRO="$VERSION"
+			;;
+		*)
+			community_live_iso_setup "$VERSION" || return
+			;;
+	esac
+fi
 if [ "$DISTRO" = "arch" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
 	latest "Arch x86_64" \
@@ -8166,21 +8264,31 @@ if [ "$DISTRO" = "guix" ];then
 	guix_iso_setup "$VERSION" || return
 fi
 if [ "$DISTRO" = "slackware" ];then
-	dialog --backtitle "$TITLE" --menu "Choose a system to install:" 20 70 13 \
+	dialog --backtitle "$TITLE" --menu "Choose a Slackware or Slackware-based system:" 20 76 9 \
 	slackware64-current "Slackware64-current" \
 	slackware64-15.0 "Slackware 15.0" \
 	slackware64-14.2 "Slackware 14.2" \
+	porteus-xfce-501 "Porteus 5.01 Xfce" \
+	porteux-lxde "PorteuX 2.4 LXDE" \
+	salixlive-xfce-150 "SalixLive64 Xfce 15.0" \
+	slackel-openbox-80 "Slackel 8.0 Openbox" \
 	Manual "Manually enter a version to install" 2>/tmp/nb-version || { rm -f /tmp/nb-version; return; }
 	getversion || return 0
-	if [ "$VERSION" = "slackware64-current" ];then
-		KERNELURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/generic.s/bzImage"
-		INITRDURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
-		echo -n "rw printk.time=0 nomodeset SLACK_KERNEL=generic.s" >>/tmp/nb-options
-	else
-		KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/huge.s/bzImage"
-		INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
-		echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
-	fi
+	case "$VERSION" in
+		porteus-*|porteux-*|salixlive-*|slackel-*)
+			community_live_iso_setup "$VERSION" || return
+			;;
+		slackware64-current)
+			KERNELURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/generic.s/bzImage"
+			INITRDURL="https://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
+			echo -n "rw printk.time=0 nomodeset SLACK_KERNEL=generic.s" >>/tmp/nb-options
+			;;
+		*)
+			KERNELURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/kernels/huge.s/bzImage"
+			INITRDURL="http://slackware.cs.utah.edu/pub/slackware/$VERSION/isolinux/initrd.img"
+			echo -n "load_ramdisk=1 prompt_ramdisk=0 rw" >>/tmp/nb-options
+			;;
+	esac
 fi
 if [ "$DISTRO" = "rescue" ];then
 	dialog --backtitle "$TITLE" --menu "Choose a rescue tool:" 20 75 13 \
